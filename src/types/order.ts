@@ -12,6 +12,7 @@ export interface Order {
   delivery_date: string | null;
   midtrans_order_id: string | null;
   snap_token: string | null;
+  admin_fee?: number;
   order_items: {
     id: string;
     quantity: number;
