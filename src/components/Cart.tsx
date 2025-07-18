@@ -28,7 +28,7 @@ interface CartProps {
 
 const Cart = ({ items, onUpdateCart }: CartProps) => {
   const [isOpen, setIsOpen] = useState(false);
-  const { settings: paymentSettings, loading: paymentSettingsLoading, calculateAdminFee } = usePaymentSettings();
+  const { settings: paymentSettings, loading: paymentSettingsLoading, calculateAdminFee, refetch: refetchPaymentSettings } = usePaymentSettings();
   const {
     children,
     selectedChildId,
@@ -43,14 +43,27 @@ const Cart = ({ items, onUpdateCart }: CartProps) => {
   useEffect(() => {
     if (isOpen) {
       fetchChildren();
+      // Force refresh payment settings when cart opens
+      refetchPaymentSettings();
     }
-  }, [isOpen]);
+  }, [isOpen, refetchPaymentSettings]);
 
-  // Log payment settings for debugging
+  // Log payment settings for debugging with more detail
   useEffect(() => {
     console.log('Cart: Payment settings updated:', paymentSettings);
     console.log('Cart: Midtrans enabled?', paymentSettings.midtransEnabled);
-  }, [paymentSettings]);
+    console.log('Cart: Payment settings loading?', paymentSettingsLoading);
+  }, [paymentSettings, paymentSettingsLoading]);
+
+  // Force refresh every time cart dialog opens
+  useEffect(() => {
+    if (isOpen) {
+      console.log('Cart: Dialog opened, forcing payment settings refresh');
+      setTimeout(() => {
+        refetchPaymentSettings();
+      }, 100);
+    }
+  }, [isOpen, refetchPaymentSettings]);
 
   const updateQuantity = (itemId: string, newQuantity: number) => {
     if (newQuantity === 0) {
@@ -177,27 +190,30 @@ const Cart = ({ items, onUpdateCart }: CartProps) => {
               </div>
             </div>
 
-            {/* Payment Method Information */}
+            {/* Payment Method Information with refresh indicator */}
             {paymentSettingsLoading ? (
               <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-600">Memuat informasi pembayaran...</p>
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-500"></div>
+                  <p className="text-sm text-gray-600">Memuat informasi pembayaran...</p>
+                </div>
               </div>
             ) : paymentSettings.midtransEnabled ? (
-              <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+              <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
                 <p className="text-sm text-blue-800">
-                  <strong>Metode Pembayaran:</strong> Midtrans (Online) atau Tunai
+                  <strong>✅ Metode Pembayaran:</strong> Midtrans (Online) atau Tunai
                 </p>
                 <p className="text-xs text-blue-600 mt-1">
                   * Pembayaran tunai tidak dikenakan biaya admin
                 </p>
               </div>
             ) : (
-              <div className="mt-4 p-3 bg-yellow-50 rounded-lg">
-                <p className="text-sm text-yellow-800">
-                  <strong>Metode Pembayaran:</strong> Hanya Tunai
+              <div className="mt-4 p-3 bg-red-50 rounded-lg border border-red-200">
+                <p className="text-sm text-red-800">
+                  <strong>❌ Metode Pembayaran:</strong> Hanya Tunai
                 </p>
-                <p className="text-xs text-yellow-600 mt-1">
-                  * Pembayaran online sedang tidak tersedia
+                <p className="text-xs text-red-600 mt-1">
+                  * Pembayaran online sedang TIDAK TERSEDIA
                 </p>
               </div>
             )}
@@ -214,7 +230,10 @@ const Cart = ({ items, onUpdateCart }: CartProps) => {
                   Memproses...
                 </div>
               ) : paymentSettingsLoading ? (
-                'Memuat...'
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Memuat...
+                </div>
               ) : paymentSettings.midtransEnabled ? (
                 `Checkout ${formatPrice(totalWithFee)}`
               ) : (

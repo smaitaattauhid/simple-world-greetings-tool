@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -59,10 +60,11 @@ export const usePaymentSettings = () => {
   useEffect(() => {
     fetchSettings();
     
-    // Set up real-time subscription to system_settings changes
+    // Set up real-time subscription to system_settings changes with aggressive refresh
     console.log('usePaymentSettings: Setting up real-time subscription');
+    const channelName = `system_settings_changes_${Date.now()}_${Math.random()}`;
     const subscription = supabase
-      .channel(`system_settings_changes_${Date.now()}`) // Unique channel name
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -73,17 +75,27 @@ export const usePaymentSettings = () => {
         },
         (payload) => {
           console.log('usePaymentSettings: Real-time update received:', payload);
-          // Always refetch to ensure we have the latest data
-          fetchSettings();
+          // Force immediate refetch with a small delay to ensure DB consistency
+          setTimeout(() => {
+            console.log('usePaymentSettings: Force refetching after real-time update');
+            fetchSettings();
+          }, 100);
         }
       )
       .subscribe((status) => {
         console.log('usePaymentSettings: Subscription status:', status);
       });
 
+    // Also poll every 5 seconds as backup
+    const pollInterval = setInterval(() => {
+      console.log('usePaymentSettings: Polling for settings updates');
+      fetchSettings();
+    }, 5000);
+
     return () => {
-      console.log('usePaymentSettings: Cleaning up subscription');
+      console.log('usePaymentSettings: Cleaning up subscription and polling');
       subscription.unsubscribe();
+      clearInterval(pollInterval);
     };
   }, []);
 
