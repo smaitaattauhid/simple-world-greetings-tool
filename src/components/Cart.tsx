@@ -30,7 +30,7 @@ interface CartProps {
 
 const Cart = ({ items, onUpdateCart }: CartProps) => {
   const [isOpen, setIsOpen] = useState(false);
-  const { settings: paymentSettings, calculateAdminFee, calculateTotalWithFee } = usePaymentSettings();
+  const { settings: paymentSettings, loading: paymentSettingsLoading, calculateAdminFee } = usePaymentSettings();
   const {
     children,
     selectedChildId,
@@ -47,6 +47,11 @@ const Cart = ({ items, onUpdateCart }: CartProps) => {
       fetchChildren();
     }
   }, [isOpen]);
+
+  // Log payment settings for debugging
+  useEffect(() => {
+    console.log('Cart: Payment settings updated:', paymentSettings);
+  }, [paymentSettings]);
 
   const updateQuantity = (itemId: string, newQuantity: number) => {
     if (newQuantity === 0) {
@@ -80,8 +85,7 @@ const Cart = ({ items, onUpdateCart }: CartProps) => {
 
   const onCheckout = async () => {
     const subtotal = getSubtotal();
-    const adminFee = calculateAdminFee(subtotal, 'midtrans');
-    const totalAmount = subtotal + adminFee;
+    const adminFee = paymentSettings.midtransEnabled ? calculateAdminFee(subtotal, 'midtrans') : 0;
     
     await handleCheckout(items, adminFee, () => {
       // Clear cart and close dialog
@@ -101,6 +105,9 @@ const Cart = ({ items, onUpdateCart }: CartProps) => {
   const totalWithFee = subtotal + adminFee;
   const canCheckout = selectedChildId && children.length > 0;
 
+  // Show loading if payment settings are still loading
+  const displayTotal = paymentSettingsLoading ? subtotal : (paymentSettings.midtransEnabled ? totalWithFee : subtotal);
+
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
@@ -109,7 +116,7 @@ const Cart = ({ items, onUpdateCart }: CartProps) => {
           className="fixed bottom-4 right-4 rounded-full shadow-lg bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 z-50"
         >
           <ShoppingCart className="h-5 w-5 mr-2" />
-          {getTotalItems()} item • {formatPrice(paymentSettings.midtransEnabled ? totalWithFee : subtotal)}
+          {getTotalItems()} item • {formatPrice(displayTotal)}
         </Button>
       </DialogTrigger>
       
@@ -149,7 +156,7 @@ const Cart = ({ items, onUpdateCart }: CartProps) => {
               
               {paymentSettings.midtransEnabled && adminFee > 0 && (
                 <div className="flex justify-between text-sm text-orange-600">
-                  <span>Biaya Admin ({paymentSettings.adminFeePercentage}%):</span>
+                  <span>Biaya Admin ({(paymentSettings.adminFeePercentage * 100).toFixed(2)}%):</span>
                   <span>{formatPrice(adminFee)}</span>
                 </div>
               )}
@@ -162,7 +169,12 @@ const Cart = ({ items, onUpdateCart }: CartProps) => {
               </div>
             </div>
 
-            {paymentSettings.midtransEnabled ? (
+            {/* Payment Method Information */}
+            {paymentSettingsLoading ? (
+              <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                <p className="text-sm text-gray-600">Memuat informasi pembayaran...</p>
+              </div>
+            ) : paymentSettings.midtransEnabled ? (
               <div className="mt-4 p-3 bg-blue-50 rounded-lg">
                 <p className="text-sm text-blue-800">
                   <strong>Metode Pembayaran:</strong> Midtrans (Online) atau Tunai
@@ -184,7 +196,7 @@ const Cart = ({ items, onUpdateCart }: CartProps) => {
 
             <Button 
               onClick={onCheckout}
-              disabled={loading || !canCheckout}
+              disabled={loading || !canCheckout || paymentSettingsLoading}
               className="w-full mt-4 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
               size="lg"
             >
@@ -193,6 +205,8 @@ const Cart = ({ items, onUpdateCart }: CartProps) => {
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                   Memproses...
                 </div>
+              ) : paymentSettingsLoading ? (
+                'Memuat...'
               ) : (
                 `Checkout ${formatPrice(paymentSettings.midtransEnabled ? totalWithFee : subtotal)}`
               )}
