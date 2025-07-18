@@ -397,6 +397,7 @@ export type Database = {
       }
       orders: {
         Row: {
+          admin_fee: number | null
           child_class: string | null
           child_id: string | null
           child_name: string | null
@@ -418,6 +419,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          admin_fee?: number | null
           child_class?: string | null
           child_id?: string | null
           child_name?: string | null
@@ -439,6 +441,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          admin_fee?: number | null
           child_class?: string | null
           child_id?: string | null
           child_name?: string | null
@@ -584,6 +587,33 @@ export type Database = {
           nik?: string
           nis?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      system_settings: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          key: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          key: string
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          key?: string
+          updated_at?: string
+          value?: string
         }
         Relationships: []
       }
