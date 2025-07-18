@@ -60,16 +60,48 @@ export const PaymentSettings = () => {
   };
 
   const updateSetting = async (key: string, value: string) => {
-    const { error } = await supabase
-      .from('system_settings')
-      .upsert({
-        key,
-        value,
-        description: key === 'midtrans_enabled' ? 'Enable/disable Midtrans payment method' : 'Admin fee percentage for Midtrans payments'
-      });
+    try {
+      // First, try to update existing record
+      const { data: existingData, error: selectError } = await supabase
+        .from('system_settings')
+        .select('id')
+        .eq('key', key)
+        .maybeSingle();
 
-    if (error) {
-      console.error('Error updating setting:', error);
+      if (selectError && selectError.code !== 'PGRST116') {
+        console.error('Error checking existing setting:', selectError);
+        throw selectError;
+      }
+
+      let error;
+      if (existingData) {
+        // Update existing record
+        const result = await supabase
+          .from('system_settings')
+          .update({ 
+            value,
+            updated_at: new Date().toISOString()
+          })
+          .eq('key', key);
+        error = result.error;
+      } else {
+        // Insert new record
+        const result = await supabase
+          .from('system_settings')
+          .insert({
+            key,
+            value,
+            description: key === 'midtrans_enabled' ? 'Enable/disable Midtrans payment method' : 'Admin fee percentage for Midtrans payments'
+          });
+        error = result.error;
+      }
+
+      if (error) {
+        console.error('Error updating setting:', error);
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error in updateSetting:', error);
       throw error;
     }
   };
