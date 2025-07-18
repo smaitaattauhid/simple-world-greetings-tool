@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -61,48 +60,28 @@ export const PaymentSettings = () => {
     try {
       console.log('PaymentSettings: Updating setting:', key, '=', value);
       
-      // Check if setting already exists
-      const { data: existingData, error: selectError } = await supabase
+      // Use upsert instead of checking existence first
+      const { error } = await supabase
         .from('system_settings')
-        .select('id')
-        .eq('key', key)
-        .maybeSingle();
-
-      console.log('PaymentSettings: Existing data check:', existingData, selectError);
-
-      if (selectError && selectError.code !== 'PGRST116') {
-        console.error('PaymentSettings: Error checking existing setting:', selectError);
-        throw selectError;
-      }
-
-      let result;
-      if (existingData) {
-        // Update existing record
-        console.log('PaymentSettings: Updating existing record');
-        result = await supabase
-          .from('system_settings')
-          .update({ 
-            value,
-            updated_at: new Date().toISOString()
-          })
-          .eq('key', key);
-      } else {
-        // Insert new record
-        console.log('PaymentSettings: Inserting new record');
-        result = await supabase
-          .from('system_settings')
-          .insert({
+        .upsert(
+          {
             key,
             value,
-            description: key === 'midtrans_enabled' ? 'Enable/disable Midtrans payment method' : 'Admin fee percentage for Midtrans payments'
-          });
-      }
+            description: key === 'midtrans_enabled' 
+              ? 'Enable/disable Midtrans payment method' 
+              : 'Admin fee percentage for Midtrans payments',
+            updated_at: new Date().toISOString()
+          },
+          {
+            onConflict: 'key'
+          }
+        );
 
-      console.log('PaymentSettings: Update/Insert result:', result);
+      console.log('PaymentSettings: Upsert result error:', error);
 
-      if (result.error) {
-        console.error('PaymentSettings: Database error:', result.error);
-        throw result.error;
+      if (error) {
+        console.error('PaymentSettings: Database error:', error);
+        throw error;
       }
 
       console.log('PaymentSettings: Successfully updated setting');
