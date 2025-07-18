@@ -5,7 +5,7 @@ import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Settings, CreditCard, Percent } from 'lucide-react';
 
@@ -21,30 +21,32 @@ export const PaymentSettings = () => {
 
   const fetchSettings = async () => {
     try {
-      // Fetch Midtrans enabled status
-      const { data: midtransData, error: midtransError } = await supabase
-        .from('system_settings')
-        .select('value')
-        .eq('key', 'midtrans_enabled')
-        .maybeSingle();
+      // Fetch both settings in parallel
+      const [{ data: midtransData, error: midtransError }, { data: feeData, error: feeError }] = await Promise.all([
+        supabase
+          .from('system_settings')
+          .select('value')
+          .eq('key', 'midtrans_enabled')
+          .maybeSingle(),
+        supabase
+          .from('system_settings')
+          .select('value')
+          .eq('key', 'midtrans_admin_fee_percentage')
+          .maybeSingle()
+      ]);
 
+      // Handle errors
       if (midtransError && midtransError.code !== 'PGRST116') {
-        throw midtransError;
+        console.error('Error fetching Midtrans setting:', midtransError);
       }
-
-      // Fetch admin fee percentage
-      const { data: feeData, error: feeError } = await supabase
-        .from('system_settings')
-        .select('value')
-        .eq('key', 'midtrans_admin_fee_percentage')
-        .maybeSingle();
-
       if (feeError && feeError.code !== 'PGRST116') {
-        throw feeError;
+        console.error('Error fetching admin fee setting:', feeError);
       }
 
-      setMidtransEnabled(midtransData?.value === 'true' || true);
+      // Set values with proper defaults
+      setMidtransEnabled(midtransData?.value === 'true');
       setAdminFeePercentage(feeData?.value ? parseFloat(feeData.value) : 0.07);
+      
     } catch (error) {
       console.error('Error fetching settings:', error);
       toast({
@@ -66,7 +68,10 @@ export const PaymentSettings = () => {
         description: key === 'midtrans_enabled' ? 'Enable/disable Midtrans payment method' : 'Admin fee percentage for Midtrans payments'
       });
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error updating setting:', error);
+      throw error;
+    }
   };
 
   const handleMidtransToggle = async (enabled: boolean) => {
@@ -86,6 +91,8 @@ export const PaymentSettings = () => {
         description: "Gagal mengubah pengaturan Midtrans",
         variant: "destructive",
       });
+      // Revert the toggle state on error
+      setMidtransEnabled(!enabled);
     } finally {
       setLoading(false);
     }

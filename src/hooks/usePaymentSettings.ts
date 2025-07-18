@@ -26,7 +26,8 @@ export const usePaymentSettings = () => {
         .in('key', ['midtrans_enabled', 'midtrans_admin_fee_percentage']);
 
       if (error && error.code !== 'PGRST116') {
-        throw error;
+        console.error('Error fetching payment settings:', error);
+        return;
       }
 
       const settingsMap = (data || []).reduce((acc, item) => {
@@ -35,7 +36,7 @@ export const usePaymentSettings = () => {
       }, {} as Record<string, string>);
 
       setSettings({
-        midtransEnabled: settingsMap.midtrans_enabled !== 'false',
+        midtransEnabled: settingsMap.midtrans_enabled === 'true',
         adminFeePercentage: parseFloat(settingsMap.midtrans_admin_fee_percentage || '0.07')
       });
     } catch (error) {
@@ -47,7 +48,8 @@ export const usePaymentSettings = () => {
 
   const calculateAdminFee = (amount: number, paymentMethod: 'midtrans' | 'cash' = 'midtrans') => {
     if (paymentMethod === 'cash') return 0;
-    return Math.round(amount * settings.adminFeePercentage / 100);
+    // Fix calculation: multiply by percentage directly, not divide by 100
+    return Math.round(amount * settings.adminFeePercentage);
   };
 
   const calculateTotalWithFee = (amount: number, paymentMethod: 'midtrans' | 'cash' = 'midtrans') => {
