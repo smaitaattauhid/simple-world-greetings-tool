@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -9,7 +8,7 @@ interface PaymentSettings {
 
 export const usePaymentSettings = () => {
   const [settings, setSettings] = useState<PaymentSettings>({
-    midtransEnabled: true,
+    midtransEnabled: false, // Start with false as default for safety
     adminFeePercentage: 0.07
   });
   const [loading, setLoading] = useState(true);
@@ -43,10 +42,15 @@ export const usePaymentSettings = () => {
         adminFeePercentage: parseFloat(settingsMap.midtrans_admin_fee_percentage || '0.07')
       };
       
-      console.log('usePaymentSettings: New settings:', newSettings);
+      console.log('usePaymentSettings: New settings applied:', newSettings);
       setSettings(newSettings);
     } catch (error) {
       console.error('usePaymentSettings: Error fetching payment settings:', error);
+      // Keep safe defaults on error
+      setSettings({
+        midtransEnabled: false,
+        adminFeePercentage: 0.07
+      });
     } finally {
       setLoading(false);
     }
@@ -56,8 +60,9 @@ export const usePaymentSettings = () => {
     fetchSettings();
     
     // Set up real-time subscription to system_settings changes
+    console.log('usePaymentSettings: Setting up real-time subscription');
     const subscription = supabase
-      .channel('system_settings_changes')
+      .channel(`system_settings_changes_${Date.now()}`) // Unique channel name
       .on(
         'postgres_changes',
         {
@@ -68,20 +73,29 @@ export const usePaymentSettings = () => {
         },
         (payload) => {
           console.log('usePaymentSettings: Real-time update received:', payload);
-          fetchSettings(); // Refetch settings when they change
+          // Always refetch to ensure we have the latest data
+          fetchSettings();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('usePaymentSettings: Subscription status:', status);
+      });
 
     return () => {
+      console.log('usePaymentSettings: Cleaning up subscription');
       subscription.unsubscribe();
     };
   }, []);
 
   const calculateAdminFee = (amount: number, paymentMethod: 'midtrans' | 'cash' = 'midtrans') => {
-    if (paymentMethod === 'cash' || !settings.midtransEnabled) return 0;
-    // Fix calculation: multiply by percentage directly, not divide by 100
-    return Math.round(amount * settings.adminFeePercentage);
+    // Only calculate admin fee if Midtrans is enabled and payment method is midtrans
+    if (paymentMethod === 'cash' || !settings.midtransEnabled) {
+      console.log('usePaymentSettings: No admin fee - cash payment or Midtrans disabled');
+      return 0;
+    }
+    const fee = Math.round(amount * settings.adminFeePercentage);
+    console.log('usePaymentSettings: Calculated admin fee:', fee, 'for amount:', amount);
+    return fee;
   };
 
   const calculateTotalWithFee = (amount: number, paymentMethod: 'midtrans' | 'cash' = 'midtrans') => {

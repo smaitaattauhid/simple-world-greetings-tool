@@ -106,6 +106,8 @@ export const useCartOperations = () => {
       const totalAmount = subtotal + adminFee;
       const orderId = `ORDER-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
+      console.log('useCartOperations: Creating order with Midtrans enabled:', paymentSettings.midtransEnabled);
+
       // Create order first
       const orderData = {
         user_id: user?.id,
@@ -142,8 +144,10 @@ export const useCartOperations = () => {
 
       if (itemsError) throw itemsError;
 
-      // Only proceed with Midtrans if enabled
+      // Check if Midtrans is enabled before proceeding with online payment
       if (paymentSettings.midtransEnabled) {
+        console.log('useCartOperations: Midtrans enabled, proceeding with online payment');
+        
         // Prepare payment data
         const customerDetails = {
           first_name: user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Customer',
@@ -222,7 +226,8 @@ export const useCartOperations = () => {
           throw new Error('Midtrans Snap not loaded or token not received');
         }
       } else {
-        // If Midtrans is disabled, just show success message
+        console.log('useCartOperations: Midtrans disabled, cash-only order created');
+        // If Midtrans is disabled, just show success message for cash payment
         toast({
           title: "Pesanan Berhasil Dibuat!",
           description: "Pesanan Anda telah dibuat. Silakan lakukan pembayaran tunai di kasir.",

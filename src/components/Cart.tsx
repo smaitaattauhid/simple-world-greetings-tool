@@ -51,6 +51,7 @@ const Cart = ({ items, onUpdateCart }: CartProps) => {
   // Log payment settings for debugging
   useEffect(() => {
     console.log('Cart: Payment settings updated:', paymentSettings);
+    console.log('Cart: Midtrans enabled?', paymentSettings.midtransEnabled);
   }, [paymentSettings]);
 
   const updateQuantity = (itemId: string, newQuantity: number) => {
@@ -85,7 +86,14 @@ const Cart = ({ items, onUpdateCart }: CartProps) => {
 
   const onCheckout = async () => {
     const subtotal = getSubtotal();
+    // Only calculate admin fee if Midtrans is enabled
     const adminFee = paymentSettings.midtransEnabled ? calculateAdminFee(subtotal, 'midtrans') : 0;
+    
+    console.log('Cart: Checkout with settings:', {
+      midtransEnabled: paymentSettings.midtransEnabled,
+      subtotal,
+      adminFee
+    });
     
     await handleCheckout(items, adminFee, () => {
       // Clear cart and close dialog
@@ -101,12 +109,13 @@ const Cart = ({ items, onUpdateCart }: CartProps) => {
   }
 
   const subtotal = getSubtotal();
+  // Only show admin fee if Midtrans is enabled
   const adminFee = paymentSettings.midtransEnabled ? calculateAdminFee(subtotal, 'midtrans') : 0;
   const totalWithFee = subtotal + adminFee;
   const canCheckout = selectedChildId && children.length > 0;
 
-  // Show loading if payment settings are still loading
-  const displayTotal = paymentSettingsLoading ? subtotal : (paymentSettings.midtransEnabled ? totalWithFee : subtotal);
+  // Show loading price if payment settings are still loading
+  const displayTotal = paymentSettingsLoading ? subtotal : totalWithFee;
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -154,6 +163,7 @@ const Cart = ({ items, onUpdateCart }: CartProps) => {
                 <span>{formatPrice(subtotal)}</span>
               </div>
               
+              {/* Only show admin fee if Midtrans is enabled and fee > 0 */}
               {paymentSettings.midtransEnabled && adminFee > 0 && (
                 <div className="flex justify-between text-sm text-orange-600">
                   <span>Biaya Admin ({(paymentSettings.adminFeePercentage * 100).toFixed(2)}%):</span>
@@ -164,7 +174,7 @@ const Cart = ({ items, onUpdateCart }: CartProps) => {
               <div className="flex justify-between font-semibold text-lg border-t pt-2">
                 <span>Total:</span>
                 <span className="text-orange-600">
-                  {formatPrice(paymentSettings.midtransEnabled ? totalWithFee : subtotal)}
+                  {formatPrice(totalWithFee)}
                 </span>
               </div>
             </div>
@@ -208,7 +218,7 @@ const Cart = ({ items, onUpdateCart }: CartProps) => {
               ) : paymentSettingsLoading ? (
                 'Memuat...'
               ) : (
-                `Checkout ${formatPrice(paymentSettings.midtransEnabled ? totalWithFee : subtotal)}`
+                `Checkout ${formatPrice(totalWithFee)}`
               )}
             </Button>
           </div>
