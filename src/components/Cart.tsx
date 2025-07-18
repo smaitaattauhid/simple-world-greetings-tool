@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -8,7 +7,6 @@ import { useCartOperations } from '@/hooks/useCartOperations';
 import { usePaymentSettings } from '@/hooks/usePaymentSettings';
 import CartItemList from '@/components/cart/CartItemList';
 import CheckoutForm from '@/components/cart/CheckoutForm';
-import OrderSummary from '@/components/cart/OrderSummary';
 
 declare global {
   interface Window {
@@ -217,8 +215,10 @@ const Cart = ({ items, onUpdateCart }: CartProps) => {
                 </div>
               ) : paymentSettingsLoading ? (
                 'Memuat...'
-              ) : (
+              ) : paymentSettings.midtransEnabled ? (
                 `Checkout ${formatPrice(totalWithFee)}`
+              ) : (
+                `Buat Pesanan Tunai ${formatPrice(totalWithFee)}`
               )}
             </Button>
           </div>

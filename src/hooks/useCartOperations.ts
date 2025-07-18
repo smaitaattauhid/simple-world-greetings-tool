@@ -144,7 +144,7 @@ export const useCartOperations = () => {
 
       if (itemsError) throw itemsError;
 
-      // Check if Midtrans is enabled before proceeding with online payment
+      // Check if Midtrans is enabled AFTER order creation but before proceeding with payment
       if (paymentSettings.midtransEnabled) {
         console.log('useCartOperations: Midtrans enabled, proceeding with online payment');
         
