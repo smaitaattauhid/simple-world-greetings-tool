@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ArrowLeft, CreditCard, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { usePaymentSettings } from '@/hooks/usePaymentSettings';
 import { supabase } from '@/integrations/supabase/client';
 import { Order } from '@/types/order';
 import { formatPrice, formatDate } from '@/utils/orderUtils';
@@ -20,6 +20,7 @@ export default function BatchOrders() {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { calculateAdminFee } = usePaymentSettings();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
   const [batchId, setBatchId] = useState<string>('');
@@ -47,7 +48,14 @@ export default function BatchOrders() {
     console.log('BatchOrders: Generated batch ID:', newBatchId);
   }, [batchState, navigate, toast]);
 
-  const totalAmount = orders.reduce((sum, order) => sum + order.total_amount, 0);
+  const subtotalAmount = orders.reduce((sum, order) => {
+    // Subtract existing admin fee if any to get original subtotal
+    const originalAmount = order.total_amount - (order.admin_fee || 0);
+    return sum + originalAmount;
+  }, 0);
+
+  const totalAdminFee = calculateAdminFee(subtotalAmount, 'midtrans');
+  const totalAmount = subtotalAmount + totalAdminFee;
 
   const handleBatchPayment = async () => {
     if (orders.length === 0) {
@@ -74,7 +82,8 @@ export default function BatchOrders() {
       const requestBody = {
         orderIds: orderIds,
         batchId: batchId,
-        totalAmount: totalAmount
+        totalAmount: totalAmount,
+        adminFee: totalAdminFee
       };
 
       console.log('BatchOrders: Calling create-batch-payment with:', requestBody);
@@ -224,7 +233,7 @@ export default function BatchOrders() {
                     </div>
                     <div className="text-right">
                       <p className="font-semibold text-orange-600">
-                        {formatPrice(order.total_amount)}
+                        {formatPrice(order.total_amount - (order.admin_fee || 0))}
                       </p>
                       <Badge variant="secondary" className="text-xs">
                         {order.order_items.length} item
@@ -266,8 +275,14 @@ export default function BatchOrders() {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span>Subtotal:</span>
-                  <span>{formatPrice(totalAmount)}</span>
+                  <span>{formatPrice(subtotalAmount)}</span>
                 </div>
+                {totalAdminFee > 0 && (
+                  <div className="flex justify-between text-sm text-orange-600">
+                    <span>Biaya Admin:</span>
+                    <span>{formatPrice(totalAdminFee)}</span>
+                  </div>
+                )}
                 <Separator />
                 <div className="flex justify-between font-semibold text-lg">
                   <span>Total Pembayaran:</span>
@@ -284,6 +299,9 @@ export default function BatchOrders() {
                       <li>• Batch ID: {batchId}</li>
                       <li>• Semua pesanan akan dibayar sekaligus</li>
                       <li>• Status pembayaran akan diupdate otomatis</li>
+                      {totalAdminFee > 0 && (
+                        <li>• Biaya admin 0.07% untuk transaksi Midtrans</li>
+                      )}
                     </ul>
                   </div>
                 </div>

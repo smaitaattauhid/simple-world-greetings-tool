@@ -9,7 +9,8 @@ import { OrderManager } from '@/components/admin/OrderManager';
 import { AdminStats } from '@/components/admin/AdminStats';
 import { RecentOrders } from '@/components/admin/RecentOrders';
 import { PopularItems } from '@/components/admin/PopularItems';
-import { Settings, ShoppingBag, Package, BarChart3 } from 'lucide-react';
+import { PaymentSettings } from '@/components/admin/PaymentSettings';
+import { Settings, ShoppingBag, Package, BarChart3, CreditCard } from 'lucide-react';
 
 const AdminDashboard = () => {
   const { role, loading, isAdmin } = useUserRole();
@@ -48,7 +49,7 @@ const AdminDashboard = () => {
       </div>
 
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:w-[600px]">
+        <TabsList className="grid w-full grid-cols-5 lg:w-[750px]">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <BarChart3 size={16} />
             Overview
@@ -64,6 +65,10 @@ const AdminDashboard = () => {
           <TabsTrigger value="categories" className="flex items-center gap-2">
             <Settings size={16} />
             Categories
+          </TabsTrigger>
+          <TabsTrigger value="payments" className="flex items-center gap-2">
+            <CreditCard size={16} />
+            Payments
           </TabsTrigger>
         </TabsList>
 
@@ -85,6 +90,10 @@ const AdminDashboard = () => {
 
         <TabsContent value="categories">
           <CategoryManager />
+        </TabsContent>
+
+        <TabsContent value="payments">
+          <PaymentSettings />
         </TabsContent>
       </Tabs>
     </div>

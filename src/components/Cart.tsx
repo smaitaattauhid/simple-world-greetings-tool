@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { ShoppingCart } from 'lucide-react';
 import { CartItem } from '@/types/cart';
 import { useCartOperations } from '@/hooks/useCartOperations';
+import { usePaymentSettings } from '@/hooks/usePaymentSettings';
 import CartItemList from '@/components/cart/CartItemList';
 import CheckoutForm from '@/components/cart/CheckoutForm';
 import OrderSummary from '@/components/cart/OrderSummary';
@@ -29,6 +30,7 @@ interface CartProps {
 
 const Cart = ({ items, onUpdateCart }: CartProps) => {
   const [isOpen, setIsOpen] = useState(false);
+  const { settings: paymentSettings, calculateAdminFee, calculateTotalWithFee } = usePaymentSettings();
   const {
     children,
     selectedChildId,
@@ -60,7 +62,7 @@ const Cart = ({ items, onUpdateCart }: CartProps) => {
     onUpdateCart(items.filter(item => item.id !== itemId));
   };
 
-  const getTotalPrice = () => {
+  const getSubtotal = () => {
     return items.reduce((total, item) => total + (item.price * item.quantity), 0);
   };
 
@@ -77,7 +79,11 @@ const Cart = ({ items, onUpdateCart }: CartProps) => {
   };
 
   const onCheckout = async () => {
-    await handleCheckout(items, () => {
+    const subtotal = getSubtotal();
+    const adminFee = calculateAdminFee(subtotal, 'midtrans');
+    const totalAmount = subtotal + adminFee;
+    
+    await handleCheckout(items, adminFee, () => {
       // Clear cart and close dialog
       onUpdateCart([]);
       setIsOpen(false);
@@ -90,6 +96,9 @@ const Cart = ({ items, onUpdateCart }: CartProps) => {
     return null;
   }
 
+  const subtotal = getSubtotal();
+  const adminFee = paymentSettings.midtransEnabled ? calculateAdminFee(subtotal, 'midtrans') : 0;
+  const totalWithFee = subtotal + adminFee;
   const canCheckout = selectedChildId && children.length > 0;
 
   return (
@@ -100,7 +109,7 @@ const Cart = ({ items, onUpdateCart }: CartProps) => {
           className="fixed bottom-4 right-4 rounded-full shadow-lg bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 z-50"
         >
           <ShoppingCart className="h-5 w-5 mr-2" />
-          {getTotalItems()} item • {formatPrice(getTotalPrice())}
+          {getTotalItems()} item • {formatPrice(paymentSettings.midtransEnabled ? totalWithFee : subtotal)}
         </Button>
       </DialogTrigger>
       
@@ -131,13 +140,64 @@ const Cart = ({ items, onUpdateCart }: CartProps) => {
           />
 
           {/* Order Summary */}
-          <OrderSummary
-            totalPrice={getTotalPrice()}
-            formatPrice={formatPrice}
-            onCheckout={onCheckout}
-            loading={loading}
-            canCheckout={canCheckout}
-          />
+          <div className="border-t pt-4">
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Subtotal:</span>
+                <span>{formatPrice(subtotal)}</span>
+              </div>
+              
+              {paymentSettings.midtransEnabled && adminFee > 0 && (
+                <div className="flex justify-between text-sm text-orange-600">
+                  <span>Biaya Admin ({paymentSettings.adminFeePercentage}%):</span>
+                  <span>{formatPrice(adminFee)}</span>
+                </div>
+              )}
+              
+              <div className="flex justify-between font-semibold text-lg border-t pt-2">
+                <span>Total:</span>
+                <span className="text-orange-600">
+                  {formatPrice(paymentSettings.midtransEnabled ? totalWithFee : subtotal)}
+                </span>
+              </div>
+            </div>
+
+            {paymentSettings.midtransEnabled ? (
+              <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <strong>Metode Pembayaran:</strong> Midtrans (Online) atau Tunai
+                </p>
+                <p className="text-xs text-blue-600 mt-1">
+                  * Pembayaran tunai tidak dikenakan biaya admin
+                </p>
+              </div>
+            ) : (
+              <div className="mt-4 p-3 bg-yellow-50 rounded-lg">
+                <p className="text-sm text-yellow-800">
+                  <strong>Metode Pembayaran:</strong> Hanya Tunai
+                </p>
+                <p className="text-xs text-yellow-600 mt-1">
+                  * Pembayaran online sedang tidak tersedia
+                </p>
+              </div>
+            )}
+
+            <Button 
+              onClick={onCheckout}
+              disabled={loading || !canCheckout}
+              className="w-full mt-4 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
+              size="lg"
+            >
+              {loading ? (
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Memproses...
+                </div>
+              ) : (
+                `Checkout ${formatPrice(paymentSettings.midtransEnabled ? totalWithFee : subtotal)}`
+              )}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
