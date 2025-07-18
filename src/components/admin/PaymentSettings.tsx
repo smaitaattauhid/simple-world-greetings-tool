@@ -21,34 +21,32 @@ export const PaymentSettings = () => {
 
   const fetchSettings = async () => {
     try {
-      // Fetch both settings in parallel
-      const [{ data: midtransData, error: midtransError }, { data: feeData, error: feeError }] = await Promise.all([
-        supabase
-          .from('system_settings')
-          .select('value')
-          .eq('key', 'midtrans_enabled')
-          .maybeSingle(),
-        supabase
-          .from('system_settings')
-          .select('value')
-          .eq('key', 'midtrans_admin_fee_percentage')
-          .maybeSingle()
-      ]);
+      console.log('PaymentSettings: Fetching settings...');
+      
+      const { data, error } = await supabase
+        .from('system_settings')
+        .select('key, value')
+        .in('key', ['midtrans_enabled', 'midtrans_admin_fee_percentage']);
 
-      // Handle errors
-      if (midtransError && midtransError.code !== 'PGRST116') {
-        console.error('Error fetching Midtrans setting:', midtransError);
-      }
-      if (feeError && feeError.code !== 'PGRST116') {
-        console.error('Error fetching admin fee setting:', feeError);
+      if (error && error.code !== 'PGRST116') {
+        console.error('PaymentSettings: Error fetching settings:', error);
+        throw error;
       }
 
-      // Set values with proper defaults
-      setMidtransEnabled(midtransData?.value === 'true');
-      setAdminFeePercentage(feeData?.value ? parseFloat(feeData.value) : 0.07);
+      console.log('PaymentSettings: Fetched data:', data);
+
+      const settingsMap = (data || []).reduce((acc, item) => {
+        acc[item.key] = item.value;
+        return acc;
+      }, {} as Record<string, string>);
+
+      console.log('PaymentSettings: Settings map:', settingsMap);
+
+      setMidtransEnabled(settingsMap.midtrans_enabled === 'true');
+      setAdminFeePercentage(parseFloat(settingsMap.midtrans_admin_fee_percentage || '0.07'));
       
     } catch (error) {
-      console.error('Error fetching settings:', error);
+      console.error('PaymentSettings: Error in fetchSettings:', error);
       toast({
         title: "Error",
         description: "Gagal memuat pengaturan pembayaran",
@@ -61,53 +59,64 @@ export const PaymentSettings = () => {
 
   const updateSetting = async (key: string, value: string) => {
     try {
-      // First, try to update existing record
+      console.log('PaymentSettings: Updating setting:', key, '=', value);
+      
+      // Check if setting already exists
       const { data: existingData, error: selectError } = await supabase
         .from('system_settings')
         .select('id')
         .eq('key', key)
         .maybeSingle();
 
+      console.log('PaymentSettings: Existing data check:', existingData, selectError);
+
       if (selectError && selectError.code !== 'PGRST116') {
-        console.error('Error checking existing setting:', selectError);
+        console.error('PaymentSettings: Error checking existing setting:', selectError);
         throw selectError;
       }
 
-      let error;
+      let result;
       if (existingData) {
         // Update existing record
-        const result = await supabase
+        console.log('PaymentSettings: Updating existing record');
+        result = await supabase
           .from('system_settings')
           .update({ 
             value,
             updated_at: new Date().toISOString()
           })
           .eq('key', key);
-        error = result.error;
       } else {
         // Insert new record
-        const result = await supabase
+        console.log('PaymentSettings: Inserting new record');
+        result = await supabase
           .from('system_settings')
           .insert({
             key,
             value,
             description: key === 'midtrans_enabled' ? 'Enable/disable Midtrans payment method' : 'Admin fee percentage for Midtrans payments'
           });
-        error = result.error;
       }
 
-      if (error) {
-        console.error('Error updating setting:', error);
-        throw error;
+      console.log('PaymentSettings: Update/Insert result:', result);
+
+      if (result.error) {
+        console.error('PaymentSettings: Database error:', result.error);
+        throw result.error;
       }
+
+      console.log('PaymentSettings: Successfully updated setting');
+      
     } catch (error) {
-      console.error('Error in updateSetting:', error);
+      console.error('PaymentSettings: Error in updateSetting:', error);
       throw error;
     }
   };
 
   const handleMidtransToggle = async (enabled: boolean) => {
+    console.log('PaymentSettings: Toggle called with:', enabled);
     setLoading(true);
+    
     try {
       await updateSetting('midtrans_enabled', enabled.toString());
       setMidtransEnabled(enabled);
@@ -116,11 +125,13 @@ export const PaymentSettings = () => {
         title: "Berhasil",
         description: `Pembayaran Midtrans ${enabled ? 'diaktifkan' : 'dinonaktifkan'}`,
       });
+      
+      console.log('PaymentSettings: Toggle successful');
     } catch (error) {
-      console.error('Error updating Midtrans setting:', error);
+      console.error('PaymentSettings: Toggle failed:', error);
       toast({
         title: "Error",
-        description: "Gagal mengubah pengaturan Midtrans",
+        description: "Gagal mengubah pengaturan Midtrans. Silakan coba lagi.",
         variant: "destructive",
       });
       // Revert the toggle state on error
@@ -149,10 +160,10 @@ export const PaymentSettings = () => {
         description: `Biaya admin diubah menjadi ${adminFeePercentage}%`,
       });
     } catch (error) {
-      console.error('Error updating admin fee:', error);
+      console.error('PaymentSettings: Admin fee update failed:', error);
       toast({
         title: "Error",
-        description: "Gagal mengubah biaya admin",
+        description: "Gagal mengubah biaya admin. Silakan coba lagi.",
         variant: "destructive",
       });
     } finally {
