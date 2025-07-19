@@ -1,91 +1,103 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/components/ui/use-toast';
 import { format } from 'date-fns';
 
 interface DailyMenu {
-  id: string;
-  date: string;
   food_item_id: string;
   price: number;
-  is_available: boolean;
-  max_quantity: number | null;
-  current_quantity: number;
   food_items: {
+    id: string;
     name: string;
-    description: string;
-    image_url: string;
-    category: string;
+    description: string | null;
+    image_url: string | null;
+    price: number;
+    category_id: string;
+    is_available: boolean;
+    categories: {
+      name: string;
+    } | null;
   };
 }
 
 export const useDailyMenus = () => {
   const [dailyMenus, setDailyMenus] = useState<DailyMenu[]>([]);
+  const [loading, setLoading] = useState(false);
 
   const fetchDailyMenus = async (date: Date) => {
+    setLoading(true);
     try {
       const dateStr = format(date, 'yyyy-MM-dd');
       
-      // Check if date is available in order_schedules
-      const { data: schedule } = await supabase
+      // First check if there's a schedule for this date
+      const { data: schedule, error: scheduleError } = await supabase
         .from('order_schedules')
         .select('*')
         .eq('date', dateStr)
-        .single();
-
-      // If date is blocked, return empty menus
-      if (schedule?.is_blocked) {
-        setDailyMenus([]);
-        return;
+        .maybeSingle(); // Use maybeSingle instead of single to avoid 406 error
+      
+      if (scheduleError && scheduleError.code !== 'PGRST116') {
+        console.error('Error fetching schedule:', scheduleError);
+        // If there's an error other than "no rows", continue with default menu
       }
-      
-      // Get all available menu items with category information
-      const { data, error } = await supabase
-        .from('menu_items')
-        .select(`
-          id,
-          name,
-          description,
-          image_url,
-          price,
-          category_id,
-          is_available,
-          categories (
-            name
-          )
-        `)
-        .eq('is_available', true);
 
-      if (error) throw error;
+      console.log('Schedule for date:', dateStr, schedule);
       
-      // Transform menu_items data to match DailyMenu interface
-      const transformedData: DailyMenu[] = (data || []).map(item => ({
-        id: item.id,
-        date: dateStr,
-        food_item_id: item.id,
-        price: item.price,
-        is_available: item.is_available || true,
-        max_quantity: null,
-        current_quantity: 0,
-        food_items: {
-          name: item.name,
-          description: item.description || '',
-          image_url: item.image_url || '',
-          category: item.categories?.name || 'Uncategorized'
+      // If no specific schedule exists or date is not blocked, show all available menu items
+      if (!schedule || !schedule.is_blocked) {
+        const { data: menuItems, error: menuError } = await supabase
+          .from('menu_items')
+          .select(`
+            id,
+            name,
+            description,
+            image_url,
+            price,
+            category_id,
+            is_available,
+            categories(name)
+          `)
+          .eq('is_available', true);
+
+        if (menuError) {
+          console.error('Error fetching menu items:', menuError);
+          setDailyMenus([]);
+        } else {
+          // Transform menu items to match DailyMenu interface
+          const transformedMenus: DailyMenu[] = (menuItems || []).map(item => ({
+            food_item_id: item.id,
+            price: item.price,
+            food_items: {
+              id: item.id,
+              name: item.name,
+              description: item.description,
+              image_url: item.image_url,
+              price: item.price,
+              category_id: item.category_id,
+              is_available: item.is_available,
+              categories: item.categories
+            }
+          }));
+          
+          setDailyMenus(transformedMenus);
+          console.log('Fetched menu items for date:', dateStr, transformedMenus.length);
         }
-      }));
-
-      setDailyMenus(transformedData);
+      } else {
+        // Date is blocked, no menu available
+        setDailyMenus([]);
+        console.log('Date is blocked, no menu available');
+      }
     } catch (error) {
-      console.error('Error fetching daily menus:', error);
-      toast({
-        title: "Error",
-        description: "Gagal memuat menu harian",
-        variant: "destructive",
-      });
+      console.error('Error in fetchDailyMenus:', error);
+      setDailyMenus([]);
+    } finally {
+      setLoading(false);
     }
   };
 
-  return { dailyMenus, fetchDailyMenus };
+  return {
+    dailyMenus,
+    loading,
+    fetchDailyMenus
+  };
 };
