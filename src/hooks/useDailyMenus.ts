@@ -4,19 +4,18 @@ import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 
 interface DailyMenu {
+  id: string;
+  date: string;
   food_item_id: string;
   price: number;
+  is_available: boolean;
+  max_quantity: number | null;
+  current_quantity: number;
   food_items: {
-    id: string;
     name: string;
-    description: string | null;
-    image_url: string | null;
-    price: number;
-    category_id: string;
-    is_available: boolean;
-    categories: {
-      name: string;
-    } | null;
+    description: string;
+    image_url: string;
+    category: string;
   };
 }
 
@@ -34,11 +33,10 @@ export const useDailyMenus = () => {
         .from('order_schedules')
         .select('*')
         .eq('date', dateStr)
-        .maybeSingle(); // Use maybeSingle instead of single to avoid 406 error
+        .maybeSingle();
       
       if (scheduleError && scheduleError.code !== 'PGRST116') {
         console.error('Error fetching schedule:', scheduleError);
-        // If there's an error other than "no rows", continue with default menu
       }
 
       console.log('Schedule for date:', dateStr, schedule);
@@ -65,17 +63,18 @@ export const useDailyMenus = () => {
         } else {
           // Transform menu items to match DailyMenu interface
           const transformedMenus: DailyMenu[] = (menuItems || []).map(item => ({
+            id: `daily-${item.id}-${dateStr}`,
+            date: dateStr,
             food_item_id: item.id,
             price: item.price,
+            is_available: item.is_available,
+            max_quantity: null,
+            current_quantity: 0,
             food_items: {
-              id: item.id,
               name: item.name,
-              description: item.description,
-              image_url: item.image_url,
-              price: item.price,
-              category_id: item.category_id,
-              is_available: item.is_available,
-              categories: item.categories
+              description: item.description || '',
+              image_url: item.image_url || '/placeholder.svg',
+              category: item.categories?.name || 'Uncategorized'
             }
           }));
           
