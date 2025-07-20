@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { UserRoleManager } from '@/components/admin/UserRoleManager';
+import { UserPasswordReset } from '@/components/admin/UserPasswordReset';
 
 const UserManagement = () => {
   return (
@@ -12,7 +13,10 @@ const UserManagement = () => {
         <p className="text-gray-600">Kelola role dan akses pengguna sistem</p>
       </div>
 
-      <UserRoleManager />
+      <div className="space-y-6">
+        <UserPasswordReset />
+        <UserRoleManager />
+      </div>
     </div>
   );
 };
