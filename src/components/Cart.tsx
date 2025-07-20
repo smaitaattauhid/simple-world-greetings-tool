@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -97,7 +98,7 @@ const Cart = ({ items, onUpdateCart }: CartProps) => {
 
   const onCheckout = async () => {
     const subtotal = getSubtotal();
-    // Only calculate admin fee if Midtrans is enabled
+    // When Midtrans is disabled, don't calculate admin fee for parent orders
     const adminFee = paymentSettings.midtransEnabled ? calculateAdminFee(subtotal, 'midtrans') : 0;
     
     console.log('Cart: Checkout with settings:', {
@@ -120,7 +121,7 @@ const Cart = ({ items, onUpdateCart }: CartProps) => {
   }
 
   const subtotal = getSubtotal();
-  // Only show admin fee if Midtrans is enabled
+  // Show admin fee only when Midtrans is enabled
   const adminFee = paymentSettings.midtransEnabled ? calculateAdminFee(subtotal, 'midtrans') : 0;
   const totalWithFee = subtotal + adminFee;
   const canCheckout = selectedChildId && children.length > 0;
@@ -201,19 +202,22 @@ const Cart = ({ items, onUpdateCart }: CartProps) => {
             ) : paymentSettings.midtransEnabled ? (
               <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
                 <p className="text-sm text-blue-800">
-                  <strong>✅ Metode Pembayaran:</strong> Midtrans (Online) atau Tunai
+                  <strong>✅ Metode Pembayaran:</strong> Midtrans (Online) atau Tunai di Kasir
                 </p>
                 <p className="text-xs text-blue-600 mt-1">
                   * Pembayaran tunai tidak dikenakan biaya admin
                 </p>
               </div>
             ) : (
-              <div className="mt-4 p-3 bg-red-50 rounded-lg border border-red-200">
-                <p className="text-sm text-red-800">
-                  <strong>❌ Metode Pembayaran:</strong> Hanya Tunai
+              <div className="mt-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                <p className="text-sm text-yellow-800">
+                  <strong>💰 Metode Pembayaran:</strong> Pembayaran Tunai di Kasir
                 </p>
-                <p className="text-xs text-red-600 mt-1">
-                  * Pembayaran online sedang TIDAK TERSEDIA
+                <p className="text-xs text-yellow-600 mt-1">
+                  * Pesanan akan dibuat dan dapat dibayar tunai di kasir
+                </p>
+                <p className="text-xs text-yellow-600">
+                  * Pembayaran online sedang tidak tersedia
                 </p>
               </div>
             )}
@@ -237,7 +241,7 @@ const Cart = ({ items, onUpdateCart }: CartProps) => {
               ) : paymentSettings.midtransEnabled ? (
                 `Checkout ${formatPrice(totalWithFee)}`
               ) : (
-                `Buat Pesanan Tunai ${formatPrice(totalWithFee)}`
+                `Buat Pesanan Tunai ${formatPrice(subtotal)}`
               )}
             </Button>
           </div>

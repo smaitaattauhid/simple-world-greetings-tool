@@ -108,18 +108,19 @@ export const useCartOperations = () => {
 
       console.log('useCartOperations: Creating order with Midtrans enabled:', paymentSettings.midtransEnabled);
 
-      // Create order first
+      // Create order first - payment_method will be determined by Midtrans setting
       const orderData = {
         user_id: user?.id,
         total_amount: totalAmount,
         admin_fee: adminFee,
         notes: notes || null,
         status: 'pending',
-        payment_status: 'pending',
+        payment_status: paymentSettings.midtransEnabled ? 'pending' : 'pending_cash',
+        payment_method: paymentSettings.midtransEnabled ? 'midtrans' : 'cash',
         order_number: orderId,
         child_name: selectedChild?.name || null,
         child_class: selectedChild?.class_name || null,
-        midtrans_order_id: orderId
+        midtrans_order_id: paymentSettings.midtransEnabled ? orderId : null
       };
 
       const { data: order, error: orderError } = await supabase
@@ -129,6 +130,8 @@ export const useCartOperations = () => {
         .single();
 
       if (orderError) throw orderError;
+
+      console.log('Order created successfully:', order);
 
       // Create order items using the correct menu_item_id from the cart items
       const orderItems = items.map(item => ({
@@ -227,10 +230,11 @@ export const useCartOperations = () => {
         }
       } else {
         console.log('useCartOperations: Midtrans disabled, cash-only order created');
-        // If Midtrans is disabled, just show success message for cash payment
+        // If Midtrans is disabled, create cash order that can be paid at cashier
         toast({
           title: "Pesanan Berhasil Dibuat!",
-          description: "Pesanan Anda telah dibuat. Silakan lakukan pembayaran tunai di kasir.",
+          description: "Pesanan Anda telah dibuat dengan nomor " + orderId + ". Silakan bayar tunai di kasir untuk menyelesaikan pesanan.",
+          duration: 6000,
         });
         onSuccess();
       }
