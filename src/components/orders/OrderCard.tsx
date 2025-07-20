@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,7 @@ import {
   canPayOrder
 } from '@/utils/orderUtils';
 import { useInvoicePDF } from '@/hooks/useInvoicePDF';
+import { usePaymentSettings } from '@/hooks/usePaymentSettings';
 
 interface OrderCardProps {
   order: Order;
@@ -24,6 +26,15 @@ export const OrderCard = ({ order, onRetryPayment }: OrderCardProps) => {
   const orderExpired = isOrderExpired(order.delivery_date);
   const canPay = canPayOrder(order);
   const { handleDownloadPDF } = useInvoicePDF({ order });
+  const { settings: paymentSettings } = usePaymentSettings();
+
+  // Check if order can show payment button (must have Midtrans enabled and be pending)
+  const showPaymentButton = paymentSettings.midtransEnabled && 
+                            order.payment_status === 'pending' && 
+                            !orderExpired;
+
+  // Check if can download PDF (must be paid and not expired)
+  const canDownloadPDF = order.payment_status === 'paid' && !orderExpired;
 
   return (
     <Card className={`hover:shadow-lg transition-shadow ${orderExpired ? 'opacity-75 border-red-200' : ''}`}>
@@ -128,6 +139,15 @@ export const OrderCard = ({ order, onRetryPayment }: OrderCardProps) => {
             </div>
           )}
 
+          {/* Payment Status Information */}
+          {!paymentSettings.midtransEnabled && order.payment_status === 'pending_cash' && (
+            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-sm text-yellow-800">
+                <strong>Pembayaran Tunai:</strong> Silakan bayar di kasir untuk menyelesaikan pesanan ini.
+              </p>
+            </div>
+          )}
+
           {/* Expired Order Warning */}
           {orderExpired && order.payment_status === 'pending' && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -139,31 +159,49 @@ export const OrderCard = ({ order, onRetryPayment }: OrderCardProps) => {
 
           {/* Action Buttons */}
           <div className="space-y-2">
-            {/* Payment Button */}
-            {order.payment_status === 'pending' && (
+            {/* Payment Button - Only show if Midtrans is enabled */}
+            {showPaymentButton && (
               <Button 
                 className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
                 onClick={() => onRetryPayment(order)}
                 disabled={!canPay}
               >
-                {orderExpired 
-                  ? 'Tidak Dapat Dibayar (Kadaluarsa)' 
-                  : order.midtrans_order_id 
-                    ? 'Lanjutkan Pembayaran' 
-                    : 'Bayar Sekarang'
+                {order.midtrans_order_id 
+                  ? 'Lanjutkan Pembayaran' 
+                  : 'Bayar Sekarang'
                 }
               </Button>
             )}
 
-            {/* Download Invoice Button */}
-            <Button 
-              variant="outline"
-              className="w-full"
-              onClick={handleDownloadPDF}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Download Invoice PDF
-            </Button>
+            {/* Download Invoice Button - Only for paid and non-expired orders */}
+            {canDownloadPDF && (
+              <Button 
+                variant="outline"
+                className="w-full"
+                onClick={handleDownloadPDF}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download Invoice PDF
+              </Button>
+            )}
+
+            {/* Show message for cash payment orders */}
+            {!paymentSettings.midtransEnabled && order.payment_status === 'pending_cash' && (
+              <div className="text-center p-2 bg-blue-50 rounded-lg">
+                <p className="text-sm text-blue-700">
+                  Pesanan ini akan dibayar tunai di kasir
+                </p>
+              </div>
+            )}
+
+            {/* Show message when PDF download is not available */}
+            {!canDownloadPDF && order.payment_status !== 'paid' && (
+              <div className="text-center p-2 bg-gray-50 rounded-lg">
+                <p className="text-xs text-gray-600">
+                  Invoice PDF akan tersedia setelah pembayaran selesai
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </CardContent>
