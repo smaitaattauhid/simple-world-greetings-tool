@@ -1,4 +1,3 @@
-
 import { useOrders } from '@/hooks/useOrders';
 import { OrderFilters } from '@/components/orders/OrderFilters';
 import { EmptyOrdersState } from '@/components/orders/EmptyOrdersState';
@@ -12,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { CreditCard, CheckSquare } from 'lucide-react';
 import { canPayOrder } from '@/utils/orderUtils';
+import { usePaymentSettings } from '@/hooks/usePaymentSettings';
 
 const Orders = () => {
   const { orders, loading, retryPayment } = useOrders();
@@ -20,6 +20,7 @@ const Orders = () => {
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { settings: paymentSettings } = usePaymentSettings();
 
   // Filter orders berdasarkan tab aktif
   const getFilteredOrders = () => {
@@ -39,10 +40,10 @@ const Orders = () => {
 
   const filteredOrders = getFilteredOrders();
 
-  // Get pending orders that can still be paid (not expired)
-  const pendingOrders = orders.filter(order => 
-    order.payment_status === 'pending' && canPayOrder(order)
-  );
+  // Get pending orders that can still be paid (not expired) - only if Midtrans is enabled
+  const pendingOrders = paymentSettings.midtransEnabled 
+    ? orders.filter(order => order.payment_status === 'pending' && canPayOrder(order))
+    : [];
 
   const handleSelectionChange = (orderId: string, selected: boolean) => {
     setSelectedOrderIds(prev => 
@@ -175,8 +176,8 @@ const Orders = () => {
         <EmptyOrdersState />
       ) : (
         <>
-          {/* Batch Payment Controls */}
-          {pendingOrders.length > 0 && (
+          {/* Batch Payment Controls - Only show if Midtrans is enabled */}
+          {paymentSettings.midtransEnabled && pendingOrders.length > 0 && (
             <Card className="mb-6">
               <CardContent className="p-4">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -243,6 +244,21 @@ const Orders = () => {
                     </p>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Show info when Midtrans is disabled */}
+          {!paymentSettings.midtransEnabled && orders.some(order => order.payment_status === 'pending_cash') && (
+            <Card className="mb-6">
+              <CardContent className="p-4">
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <h3 className="font-semibold text-lg text-yellow-800 mb-2">Mode Pembayaran Tunai</h3>
+                  <p className="text-sm text-yellow-700">
+                    Pembayaran online dinonaktifkan. Semua pesanan harus dibayar tunai di kasir.
+                    Tidak ada fitur pembayaran batch untuk orang tua dalam mode ini.
+                  </p>
+                </div>
               </CardContent>
             </Card>
           )}

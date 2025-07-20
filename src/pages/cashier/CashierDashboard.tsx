@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,9 +6,10 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { formatPrice, formatDate } from '@/utils/orderUtils';
-import { Search, User, Calendar, CreditCard, Receipt, Eye, EyeOff } from 'lucide-react';
+import { Search, User, Calendar, CreditCard, Receipt, Eye, EyeOff, CheckSquare, Calculator } from 'lucide-react';
 import { CashPayment } from '@/components/cashier/CashPayment';
 import { StudentSearchCombobox } from '@/components/cashier/StudentSearchCombobox';
+import { CashierBatchPayment } from '@/components/cashier/CashierBatchPayment';
 
 interface Order {
   id: string;
@@ -40,6 +40,8 @@ const CashierDashboard = () => {
   const [loading, setLoading] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [isBatchMode, setIsBatchMode] = useState(false);
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
 
   console.log('CashierDashboard: Component rendered');
 
@@ -210,6 +212,8 @@ const CashierDashboard = () => {
 
   const handlePaymentComplete = () => {
     setSelectedOrder(null);
+    setIsBatchMode(false);
+    setSelectedOrderIds([]);
     fetchPendingOrders();
   };
 
@@ -217,6 +221,42 @@ const CashierDashboard = () => {
     console.log('CashierDashboard: Toggling details for order:', orderId);
     console.log('CashierDashboard: Current expanded order:', expandedOrderId);
     setExpandedOrderId(expandedOrderId === orderId ? null : orderId);
+  };
+
+  const handleBatchSelection = (orderId: string, selected: boolean) => {
+    setSelectedOrderIds(prev => 
+      selected 
+        ? [...prev, orderId]
+        : prev.filter(id => id !== orderId)
+    );
+  };
+
+  const handleSelectAllOrders = () => {
+    const allOrderIds = orders.map(order => order.id);
+    setSelectedOrderIds(allOrderIds);
+  };
+
+  const handleClearSelection = () => {
+    setSelectedOrderIds([]);
+    setIsBatchMode(false);
+  };
+
+  const handleStartBatchPayment = () => {
+    if (selectedOrderIds.length === 0) {
+      toast({
+        title: "Pilih Pesanan",
+        description: "Silakan pilih minimal satu pesanan untuk pembayaran batch",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const selectedOrders = orders.filter(order => selectedOrderIds.includes(order.id));
+    setSelectedOrder({ 
+      ...selectedOrders[0], 
+      batchOrders: selectedOrders,
+      total_amount: selectedOrders.reduce((sum, order) => sum + order.total_amount, 0)
+    } as any);
   };
 
   const formatDateSafe = (dateString: string | null | undefined) => {
@@ -230,27 +270,51 @@ const CashierDashboard = () => {
   };
 
   if (selectedOrder) {
-    return (
-      <div className="container mx-auto p-6">
-        <div className="mb-4">
-          <Button 
-            variant="outline" 
-            onClick={() => setSelectedOrder(null)}
-            className="mb-4"
-          >
-            ← Kembali ke Daftar Pesanan
-          </Button>
+    // Check if this is a batch payment
+    const isBatchPayment = (selectedOrder as any).batchOrders;
+    
+    if (isBatchPayment) {
+      return (
+        <div className="container mx-auto p-6">
+          <div className="mb-4">
+            <Button 
+              variant="outline" 
+              onClick={() => setSelectedOrder(null)}
+              className="mb-4"
+            >
+              ← Kembali ke Daftar Pesanan
+            </Button>
+          </div>
+          <CashierBatchPayment 
+            orders={(selectedOrder as any).batchOrders}
+            onPaymentComplete={handlePaymentComplete}
+          />
         </div>
-        <CashPayment 
-          order={selectedOrder} 
-          onPaymentComplete={handlePaymentComplete}
-        />
-      </div>
-    );
+      );
+    } else {
+      return (
+        <div className="container mx-auto p-6">
+          <div className="mb-4">
+            <Button 
+              variant="outline" 
+              onClick={() => setSelectedOrder(null)}
+              className="mb-4"
+            >
+              ← Kembali ke Daftar Pesanan
+            </Button>
+          </div>
+          <CashPayment 
+            order={selectedOrder} 
+            onPaymentComplete={handlePaymentComplete}
+          />
+        </div>
+      );
+    }
   }
 
   return (
     <div className="container mx-auto p-6">
+      {/* Search Card */}
       <Card className="mb-6">
         <CardHeader>
           <CardTitle className="flex items-center">
@@ -299,10 +363,61 @@ const CashierDashboard = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Pesanan Pending Pembayaran</CardTitle>
-          <p className="text-sm text-gray-600">
-            Total: {orders.length} pesanan
-          </p>
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle>Pesanan Pending Pembayaran</CardTitle>
+              <p className="text-sm text-gray-600">
+                Total: {orders.length} pesanan
+              </p>
+            </div>
+            
+            {/* Batch Payment Controls */}
+            {orders.length > 0 && (
+              <div className="flex gap-2">
+                {!isBatchMode ? (
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsBatchMode(true)}
+                    className="flex items-center"
+                  >
+                    <CheckSquare className="h-4 w-4 mr-2" />
+                    Mode Batch
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      variant="outline"
+                      onClick={handleClearSelection}
+                    >
+                      Batal
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={handleSelectAllOrders}
+                    >
+                      Pilih Semua
+                    </Button>
+                    <Button
+                      onClick={handleStartBatchPayment}
+                      disabled={selectedOrderIds.length === 0}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      <Calculator className="h-4 w-4 mr-2" />
+                      Bayar Batch ({selectedOrderIds.length})
+                    </Button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+          
+          {isBatchMode && (
+            <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+              <p className="text-sm text-blue-800">
+                <strong>Mode Pembayaran Batch:</strong> Pilih pesanan yang ingin dibayar sekaligus untuk memproses pembayaran tunai secara bersamaan.
+              </p>
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -316,70 +431,84 @@ const CashierDashboard = () => {
           ) : (
             <div className="space-y-4">
               {orders.map((order) => (
-                <Card key={order.id} className="border-l-4 border-l-orange-500">
+                <Card key={order.id} className={`border-l-4 border-l-orange-500 ${isBatchMode && selectedOrderIds.includes(order.id) ? 'ring-2 ring-blue-500 bg-blue-50' : ''}`}>
                   <CardContent className="p-4">
                     <div className="flex justify-between items-start mb-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <User className="h-4 w-4 text-orange-600" />
-                          <span className="font-semibold">{order.child_name}</span>
-                          <Badge variant="outline">{order.child_class}</Badge>
-                        </div>
-
-                        {order.children && (order.children.nik || order.children.nis) && (
-                          <div className="text-sm text-gray-600 mb-2">
-                            {order.children.nik && (
-                              <span className="mr-4">NIK: {order.children.nik}</span>
-                            )}
-                            {order.children.nis && (
-                              <span>NIS: {order.children.nis}</span>
-                            )}
-                          </div>
+                      <div className="flex items-start gap-3">
+                        {/* Batch Mode Checkbox */}
+                        {isBatchMode && (
+                          <input
+                            type="checkbox"
+                            checked={selectedOrderIds.includes(order.id)}
+                            onChange={(e) => handleBatchSelection(order.id, e.target.checked)}
+                            className="mt-1 h-4 w-4 text-blue-600 rounded focus:ring-blue-500"
+                          />
                         )}
-
-                        <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">
-                          <div className="flex items-center">
-                            <Calendar className="h-4 w-4 mr-1" />
-                            <span>Katering: {formatDateSafe(order.delivery_date)}</span>
+                        
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <User className="h-4 w-4 text-orange-600" />
+                            <span className="font-semibold">{order.child_name}</span>
+                            <Badge variant="outline">{order.child_class}</Badge>
                           </div>
-                          <div className="flex items-center">
-                            <Receipt className="h-4 w-4 mr-1" />
-                            <span>{order.order_items?.length || 0} item</span>
-                          </div>
-                        </div>
 
-                        <div className="flex justify-between items-center">
-                          <div className="flex gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => toggleOrderDetails(order.id)}
-                            >
-                              {expandedOrderId === order.id ? (
-                                <>
-                                  <EyeOff className="h-4 w-4 mr-1" />
-                                  Sembunyikan Detail
-                                </>
-                              ) : (
-                                <>
-                                  <Eye className="h-4 w-4 mr-1" />
-                                  Lihat Detail
-                                </>
+                          {order.children && (order.children.nik || order.children.nis) && (
+                            <div className="text-sm text-gray-600 mb-2">
+                              {order.children.nik && (
+                                <span className="mr-4">NIK: {order.children.nik}</span>
                               )}
-                            </Button>
+                              {order.children.nis && (
+                                <span>NIS: {order.children.nis}</span>
+                              )}
+                            </div>
+                          )}
+
+                          <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">
+                            <div className="flex items-center">
+                              <Calendar className="h-4 w-4 mr-1" />
+                              <span>Katering: {formatDateSafe(order.delivery_date)}</span>
+                            </div>
+                            <div className="flex items-center">
+                              <Receipt className="h-4 w-4 mr-1" />
+                              <span>{order.order_items?.length || 0} item</span>
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <p className="text-lg font-bold text-orange-600">
-                              {formatPrice(order.total_amount)}
-                            </p>
-                            <Button
-                              onClick={() => setSelectedOrder(order)}
-                              className="mt-2"
-                              size="sm"
-                            >
-                              <CreditCard className="h-4 w-4 mr-1" />
-                              Bayar Tunai
-                            </Button>
+
+                          <div className="flex justify-between items-center">
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => toggleOrderDetails(order.id)}
+                              >
+                                {expandedOrderId === order.id ? (
+                                  <>
+                                    <EyeOff className="h-4 w-4 mr-1" />
+                                    Sembunyikan Detail
+                                  </>
+                                ) : (
+                                  <>
+                                    <Eye className="h-4 w-4 mr-1" />
+                                    Lihat Detail
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-lg font-bold text-orange-600">
+                                {formatPrice(order.total_amount)}
+                              </p>
+                              {!isBatchMode && (
+                                <Button
+                                  onClick={() => setSelectedOrder(order)}
+                                  className="mt-2"
+                                  size="sm"
+                                >
+                                  <CreditCard className="h-4 w-4 mr-1" />
+                                  Bayar Tunai
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
