@@ -8,6 +8,7 @@ import Index from '@/pages/Index';
 import Orders from '@/pages/Orders';
 import BatchOrders from '@/pages/BatchOrders';
 import Children from '@/pages/Children';
+import Profile from '@/pages/Profile';
 import Auth from '@/pages/Auth';
 import AdminDashboard from '@/pages/admin/AdminDashboard';
 import FoodManagement from '@/pages/admin/FoodManagement';
@@ -96,6 +97,9 @@ function AppContent() {
                     </>
                   )
                 } />
+                
+                {/* Profile route - available for all users */}
+                <Route path="/profile" element={<><Navbar /><Profile /></>} />
                 
                 {/* Parent routes */}
                 {(userRole === 'parent' || !userRole) && (

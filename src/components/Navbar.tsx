@@ -12,6 +12,7 @@ import {
   TrendingUp,
   UserCog,
   GraduationCap,
+  User,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -51,17 +52,20 @@ export const Navbar = () => {
         { path: '/admin/populate-daily-menus', label: 'Isi Menu Harian', icon: Plus },
         { path: '/admin/user-management', label: 'Kelola Pengguna', icon: UserCog },
         { path: '/admin/student-management', label: 'Kelola Siswa', icon: GraduationCap },
+        { path: '/profile', label: 'Profile Saya', icon: User },
       ];
     } else if (userRole === 'cashier') {
       return [
         { path: '/cashier', label: 'Dashboard Kasir', icon: BarChart3 },
         { path: '/cashier/reports', label: 'Laporan Kasir', icon: FileText },
+        { path: '/profile', label: 'Profile Saya', icon: User },
       ];
     } else {
       return [
         { path: '/', label: 'Beranda', icon: Home },
         { path: '/orders', label: 'Pesanan Saya', icon: ShoppingCart },
         { path: '/children', label: 'Data Anak', icon: Users },
+        { path: '/profile', label: 'Profile Saya', icon: User },
       ];
     }
   };
@@ -107,6 +111,13 @@ export const Navbar = () => {
                   </p>
                 </div>
               </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link to="/profile" className="w-full cursor-pointer">
+                  <User className="mr-2 h-4 w-4" />
+                  <span>Profile Saya</span>
+                </Link>
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleSignOut}>
                 Logout
