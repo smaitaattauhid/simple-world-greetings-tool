@@ -21,10 +21,24 @@ export const UserRoleRow = ({ user, currentRole, onRoleChange }: UserRoleRowProp
     }
   };
 
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case 'admin': return 'Admin';
+      case 'cashier': return 'Kasir';
+      case 'parent': return 'Parent';
+      default: return role;
+    }
+  };
+
   const displayName = user.full_name || `User ${user.id.slice(0, 8)}`;
   const displaySubtext = user.full_name 
     ? `ID: ${user.id.slice(0, 8)}...` 
     : `ID: ${user.id}`;
+
+  const handleRoleChange = (newRole: string) => {
+    console.log('Role change requested:', { userId: user.id, currentRole, newRole });
+    onRoleChange(user.id, newRole);
+  };
 
   return (
     <div className="flex items-center justify-between p-4 border rounded-lg">
@@ -40,14 +54,14 @@ export const UserRoleRow = ({ user, currentRole, onRoleChange }: UserRoleRowProp
             {displaySubtext}
           </p>
           <p className="text-xs text-gray-400">
-            Role saat ini: {currentRole}
+            Role saat ini: {getRoleLabel(currentRole)}
           </p>
         </div>
       </div>
       <div className="flex items-center space-x-2">
         <Select
           value={currentRole}
-          onValueChange={(newRole) => onRoleChange(user.id, newRole)}
+          onValueChange={handleRoleChange}
         >
           <SelectTrigger className="w-32">
             <SelectValue />

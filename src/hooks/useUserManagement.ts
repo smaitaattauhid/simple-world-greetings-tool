@@ -89,10 +89,33 @@ export const useUserManagement = () => {
     try {
       console.log('Updating role for user:', userId, 'to:', newRole);
       
-      // Update or insert user role
-      const { error: roleError } = await supabase
+      // First, try to update existing role
+      const { data: existingRole, error: checkError } = await supabase
         .from('user_roles')
-        .upsert({ user_id: userId, role: newRole });
+        .select('id')
+        .eq('user_id', userId)
+        .single();
+
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.error('Error checking existing role:', checkError);
+        throw checkError;
+      }
+
+      let roleError;
+      if (existingRole) {
+        // Update existing role
+        const { error } = await supabase
+          .from('user_roles')
+          .update({ role: newRole })
+          .eq('user_id', userId);
+        roleError = error;
+      } else {
+        // Insert new role
+        const { error } = await supabase
+          .from('user_roles')
+          .insert({ user_id: userId, role: newRole });
+        roleError = error;
+      }
 
       if (roleError) {
         console.error('Error updating user_roles:', roleError);
@@ -107,7 +130,8 @@ export const useUserManagement = () => {
 
       if (profileError) {
         console.error('Error updating profiles:', profileError);
-        throw profileError;
+        // Don't throw here as the main role update succeeded
+        console.warn('Profile role update failed but user_roles was updated successfully');
       }
 
       toast({
@@ -116,12 +140,12 @@ export const useUserManagement = () => {
       });
 
       // Refresh data
-      fetchUsersAndRoles();
+      await fetchUsersAndRoles();
     } catch (error) {
       console.error('Error updating role:', error);
       toast({
         title: "Error",
-        description: "Gagal mengubah role pengguna",
+        description: "Gagal mengubah role pengguna. Periksa izin admin Anda.",
         variant: "destructive",
       });
     }
