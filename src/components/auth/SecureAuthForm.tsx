@@ -5,9 +5,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/hooks/useAuth';
 import { validateInput, validatePasswordStrength, sanitizeInput } from '@/utils/securityValidation';
 import { useRateLimit } from '@/hooks/useRateLimit';
+import { GoogleAuthButton } from './GoogleAuthButton';
 import { Shield, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 
 interface SecureAuthFormProps {
@@ -116,7 +118,19 @@ export const SecureAuthForm: React.FC<SecureAuthFormProps> = ({ mode, onModeChan
           }
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
+        {/* Google OAuth Button */}
+        <GoogleAuthButton mode={mode} />
+        
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <Separator className="w-full" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+          </div>
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-4">
           {mode === 'register' && (
             <div className="space-y-2">
