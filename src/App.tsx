@@ -1,162 +1,224 @@
 
-import React from 'react';
-import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Toaster } from '@/components/ui/toaster';
+import { Toaster as Sonner } from '@/components/ui/sonner';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from '@/components/AuthProvider';
 import { useAuth } from '@/hooks/useAuth';
-import { Navbar } from '@/components/Navbar';
+import { useUserRole } from '@/hooks/useUserRole';
+import { MidtransScript } from '@/components/MidtransScript';
 import Index from '@/pages/Index';
+import Auth from '@/pages/Auth';
+import Profile from '@/pages/Profile';
+import Children from '@/pages/Children';
 import Orders from '@/pages/Orders';
 import BatchOrders from '@/pages/BatchOrders';
-import Children from '@/pages/Children';
-import Profile from '@/pages/Profile';
-import Auth from '@/pages/Auth';
 import AdminDashboard from '@/pages/admin/AdminDashboard';
-import FoodManagement from '@/pages/admin/FoodManagement';
 import OrderManagement from '@/pages/admin/OrderManagement';
-import { OrderRecap } from '@/pages/admin/OrderRecap';
+import FoodManagement from '@/pages/admin/FoodManagement';
+import UserManagement from '@/pages/admin/UserManagement';
+import StudentManagement from '@/pages/admin/StudentManagement';
+import OrderRecap from '@/pages/admin/OrderRecap';
 import Reports from '@/pages/admin/Reports';
 import ScheduleManagement from '@/pages/admin/ScheduleManagement';
 import PopulateDailyMenus from '@/pages/admin/PopulateDailyMenus';
-import UserManagement from '@/pages/admin/UserManagement';
-import StudentManagement from '@/pages/admin/StudentManagement';
-import MidtransScript from '@/components/MidtransScript';
 import CashierDashboard from '@/pages/cashier/CashierDashboard';
 import CashierReports from '@/pages/cashier/CashierReports';
-import { useUserRole } from '@/hooks/useUserRole';
+import NotFound from '@/pages/NotFound';
 
-function AppContent() {
-  const { user, loading: authLoading } = useAuth();
-  const { role: userRole, loading: roleLoading } = useUserRole();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: false,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
-  console.log('App: Auth state - user:', user?.email || 'no user', 'authLoading:', authLoading);
-  console.log('App: Role state - role:', userRole, 'roleLoading:', roleLoading);
+// Security headers component
+const SecurityHeaders = () => {
+  useEffect(() => {
+    // Add Content Security Policy
+    const meta = document.createElement('meta');
+    meta.httpEquiv = 'Content-Security-Policy';
+    meta.content = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://app.midtrans.com https://api.midtrans.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://ymfjbcyqgnokjyvezohk.supabase.co https://api.midtrans.com wss://ymfjbcyqgnokjyvezohk.supabase.co; frame-src 'self' https://app.midtrans.com;";
+    document.head.appendChild(meta);
 
-  const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-    const location = useLocation();
-  
-    console.log('ProtectedRoute: Checking access - authLoading:', authLoading, 'roleLoading:', roleLoading, 'user:', !!user);
-    
-    if (authLoading || roleLoading) {
-      console.log('ProtectedRoute: Still loading...');
-      return <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-orange-500"></div>
-      </div>;
-    }
-  
-    if (!user) {
-      console.log('ProtectedRoute: No user, redirecting to login');
-      return <Navigate to="/login" replace state={{ from: location }} />;
-    }
-  
-    console.log('ProtectedRoute: Access granted');
-    return <>{children}</>;
-  };
+    // Add X-Frame-Options
+    const frameOptions = document.createElement('meta');
+    frameOptions.httpEquiv = 'X-Frame-Options';
+    frameOptions.content = 'DENY';
+    document.head.appendChild(frameOptions);
 
-  // Show loading while determining auth state
-  if (authLoading || roleLoading) {
-    console.log('App: Loading state - authLoading:', authLoading, 'roleLoading:', roleLoading);
-    return <div className="flex justify-center items-center min-h-screen">
-      <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-orange-500"></div>
-    </div>;
+    // Add X-Content-Type-Options
+    const contentType = document.createElement('meta');
+    contentType.httpEquiv = 'X-Content-Type-Options';
+    contentType.content = 'nosniff';
+    document.head.appendChild(contentType);
+
+    // Add Referrer-Policy
+    const referrer = document.createElement('meta');
+    referrer.name = 'referrer';
+    referrer.content = 'strict-origin-when-cross-origin';
+    document.head.appendChild(referrer);
+
+    return () => {
+      document.head.removeChild(meta);
+      document.head.removeChild(frameOptions);
+      document.head.removeChild(contentType);
+      document.head.removeChild(referrer);
+    };
+  }, []);
+
+  return null;
+};
+
+// Protected Route component
+const ProtectedRoute = ({ children, allowedRoles = [] }: { children: React.ReactNode; allowedRoles?: string[] }) => {
+  const { user, loading } = useAuth();
+  const { role, loading: roleLoading } = useUserRole();
+
+  if (loading || roleLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+      </div>
+    );
   }
 
-  console.log('App: Rendering with role:', userRole, 'user:', !!user);
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
+
+  if (allowedRoles.length > 0 && role && !allowedRoles.includes(role)) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+// App routes component
+const AppRoutes = () => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <MidtransScript />
-      <Routes>
-        {/* Public routes */}
-        <Route path="/login" element={<Auth />} />
-        <Route path="/register" element={<Auth />} />
-        <Route path="/menu" element={<><Navbar /><Index /></>} />
-        
-        {/* Protected routes */}
-        <Route
-          path="/*"
-          element={
-            <ProtectedRoute>
-              <Routes>
-                {/* Role-based default route */}
-                <Route path="/" element={
-                  userRole === 'admin' ? (
-                    <>
-                      {console.log('App: Redirecting admin to /admin')}
-                      <Navigate to="/admin" replace />
-                    </>
-                  ) :
-                  userRole === 'cashier' ? (
-                    <>
-                      {console.log('App: Redirecting cashier to /cashier')}
-                      <Navigate to="/cashier" replace />
-                    </>
-                  ) : (
-                    <>
-                      {console.log('App: Showing parent dashboard')}
-                      <Navbar /><Index />
-                    </>
-                  )
-                } />
-                
-                {/* Profile route - available for all users */}
-                <Route path="/profile" element={<><Navbar /><Profile /></>} />
-                
-                {/* Parent routes */}
-                {(userRole === 'parent' || !userRole) && (
-                  <>
-                    <Route path="/orders" element={<><Navbar /><Orders /></>} />
-                    <Route path="/batch-orders" element={<><Navbar /><BatchOrders /></>} />
-                    <Route path="/children" element={<><Navbar /><Children /></>} />
-                  </>
-                )}
-                
-                {/* Admin routes */}
-                {userRole === 'admin' && (
-                  <>
-                    <Route path="/admin" element={<><Navbar /><AdminDashboard /></>} />
-                    <Route path="/admin/food-management" element={<><Navbar /><FoodManagement /></>} />
-                    <Route path="/admin/order-management" element={<><Navbar /><OrderManagement /></>} />
-                    <Route path="/admin/order-recap" element={<><Navbar /><OrderRecap /></>} />
-                    <Route path="/admin/reports" element={<><Navbar /><Reports /></>} />
-                    <Route path="/admin/schedule-management" element={<><Navbar /><ScheduleManagement /></>} />
-                    <Route path="/admin/populate-daily-menus" element={<><Navbar /><PopulateDailyMenus /></>} />
-                    <Route path="/admin/user-management" element={<><Navbar /><UserManagement /></>} />
-                    <Route path="/admin/student-management" element={<><Navbar /><StudentManagement /></>} />
-                  </>
-                )}
-                
-                {/* Cashier routes */}
-                {userRole === 'cashier' && (
-                  <>
-                    <Route path="/cashier" element={<><Navbar /><CashierDashboard /></>} />
-                    <Route path="/cashier/reports" element={<><Navbar /><CashierReports /></>} />
-                  </>
-                )}
-                
-                {/* Default route - redirect to appropriate dashboard */}
-                <Route path="*" element={
-                  <Navigate to={
-                    userRole === 'admin' ? '/admin' :
-                    userRole === 'cashier' ? '/cashier' :
-                    '/'
-                  } replace />
-                } />
-              </Routes>
-            </ProtectedRoute>
-          }
-        />
-      </Routes>
-    </div>
+    <Routes>
+      <Route path="/auth" element={user ? <Navigate to="/" replace /> : <Auth />} />
+      <Route path="/" element={
+        <ProtectedRoute>
+          <Index />
+        </ProtectedRoute>
+      } />
+      <Route path="/profile" element={
+        <ProtectedRoute>
+          <Profile />
+        </ProtectedRoute>
+      } />
+      <Route path="/children" element={
+        <ProtectedRoute>
+          <Children />
+        </ProtectedRoute>
+      } />
+      <Route path="/orders" element={
+        <ProtectedRoute>
+          <Orders />
+        </ProtectedRoute>
+      } />
+      <Route path="/batch-orders" element={
+        <ProtectedRoute>
+          <BatchOrders />
+        </ProtectedRoute>
+      } />
+      
+      {/* Admin Routes */}
+      <Route path="/admin" element={
+        <ProtectedRoute allowedRoles={['admin']}>
+          <AdminDashboard />
+        </ProtectedRoute>
+      } />
+      <Route path="/admin/orders" element={
+        <ProtectedRoute allowedRoles={['admin']}>
+          <OrderManagement />
+        </ProtectedRoute>
+      } />
+      <Route path="/admin/food-management" element={
+        <ProtectedRoute allowedRoles={['admin']}>
+          <FoodManagement />
+        </ProtectedRoute>
+      } />
+      <Route path="/admin/user-management" element={
+        <ProtectedRoute allowedRoles={['admin']}>
+          <UserManagement />
+        </ProtectedRoute>
+      } />
+      <Route path="/admin/student-management" element={
+        <ProtectedRoute allowedRoles={['admin']}>
+          <StudentManagement />
+        </ProtectedRoute>
+      } />
+      <Route path="/admin/recap" element={
+        <ProtectedRoute allowedRoles={['admin']}>
+          <OrderRecap />
+        </ProtectedRoute>
+      } />
+      <Route path="/admin/reports" element={
+        <ProtectedRoute allowedRoles={['admin']}>
+          <Reports />
+        </ProtectedRoute>
+      } />
+      <Route path="/admin/schedule" element={
+        <ProtectedRoute allowedRoles={['admin']}>
+          <ScheduleManagement />
+        </ProtectedRoute>
+      } />
+      <Route path="/admin/populate-menus" element={
+        <ProtectedRoute allowedRoles={['admin']}>
+          <PopulateDailyMenus />
+        </ProtectedRoute>
+      } />
+      
+      {/* Cashier Routes */}
+      <Route path="/cashier" element={
+        <ProtectedRoute allowedRoles={['cashier', 'admin']}>
+          <CashierDashboard />
+        </ProtectedRoute>
+      } />
+      <Route path="/cashier/reports" element={
+        <ProtectedRoute allowedRoles={['cashier', 'admin']}>
+          <CashierReports />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="*" element={<NotFound />} />
+    </Routes>
   );
-}
+};
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <AppContent />
-      </Router>
-    </AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <SecurityHeaders />
+        <BrowserRouter>
+          <AuthProvider>
+            <AppRoutes />
+            <MidtransScript />
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
   );
 }
 

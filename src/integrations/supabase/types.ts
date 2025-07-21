@@ -669,16 +669,24 @@ export type Database = {
       }
     }
     Functions: {
+      generate_order_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_current_user_role: {
         Args: Record<PropertyKey, never>
         Returns: string
       }
       get_user_role: {
-        Args: Record<PropertyKey, never> | { _user_id: string }
+        Args: Record<PropertyKey, never> | { _user_id?: string }
         Returns: string
       }
       has_role: {
         Args: { _user_id: string; _role: string }
+        Returns: boolean
+      }
+      validate_user_input: {
+        Args: { input_text: string }
         Returns: boolean
       }
     }

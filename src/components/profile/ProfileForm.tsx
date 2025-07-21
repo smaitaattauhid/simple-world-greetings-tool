@@ -1,108 +1,76 @@
 
-import React, { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { toast } from '@/components/ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/hooks/useAuth';
-import { User, Settings } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { validateInput, sanitizeInput } from '@/utils/securityValidation';
+import { useRateLimit } from '@/hooks/useRateLimit';
+import { toast } from '@/components/ui/use-toast';
+import { User, Phone, MapPin, AlertTriangle } from 'lucide-react';
 
-interface ProfileFormData {
+interface ProfileData {
   full_name: string;
   phone: string;
   address: string;
 }
 
-interface PasswordFormData {
-  current_password: string;
-  new_password: string;
-  confirm_password: string;
-}
-
 export const ProfileForm = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [passwordLoading, setPasswordLoading] = useState(false);
-
-  const profileForm = useForm<ProfileFormData>({
-    defaultValues: {
-      full_name: '',
-      phone: '',
-      address: ''
-    }
+  const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState<string[]>([]);
+  const [profileData, setProfileData] = useState<ProfileData>({
+    full_name: '',
+    phone: '',
+    address: ''
   });
+  
+  const { checkRateLimit, getRemainingAttempts } = useRateLimit(10, 300000); // 10 updates per 5 minutes
 
-  const passwordForm = useForm<PasswordFormData>({
-    defaultValues: {
-      current_password: '',
-      new_password: '',
-      confirm_password: ''
+  useEffect(() => {
+    if (user) {
+      fetchProfile();
     }
-  });
+  }, [user]);
 
-  React.useEffect(() => {
-    const fetchProfile = async () => {
-      if (!user?.id) return;
-
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('full_name, phone, address')
-          .eq('id', user.id)
-          .single();
-
-        if (error) {
-          console.error('Error fetching profile:', error);
-          return;
-        }
-
-        if (data) {
-          profileForm.reset({
-            full_name: data.full_name || '',
-            phone: data.phone || '',
-            address: data.address || ''
-          });
-        }
-      } catch (error) {
-        console.error('Error:', error);
-      }
-    };
-
-    fetchProfile();
-  }, [user?.id, profileForm]);
-
-  const onProfileSubmit = async (data: ProfileFormData) => {
-    if (!user?.id) return;
-
+  const fetchProfile = async () => {
+    if (!user) return;
+    
     setLoading(true);
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
-        .update({
-          full_name: data.full_name,
-          phone: data.phone,
-          address: data.address,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', user.id);
+        .select('full_name, phone, address')
+        .eq('id', user.id)
+        .single();
 
       if (error) {
-        throw error;
+        console.error('Error fetching profile:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load profile data",
+          variant: "destructive",
+        });
+        return;
       }
 
-      toast({
-        title: "Berhasil",
-        description: "Profile berhasil diperbarui",
-      });
+      if (data) {
+        setProfileData({
+          full_name: data.full_name || '',
+          phone: data.phone || '',
+          address: data.address || ''
+        });
+      }
     } catch (error) {
-      console.error('Error updating profile:', error);
+      console.error('Error fetching profile:', error);
       toast({
         title: "Error",
-        description: "Gagal memperbarui profile",
+        description: "Failed to load profile data",
         variant: "destructive",
       });
     } finally {
@@ -110,168 +78,198 @@ export const ProfileForm = () => {
     }
   };
 
-  const onPasswordSubmit = async (data: PasswordFormData) => {
-    if (data.new_password !== data.confirm_password) {
-      toast({
-        title: "Error",
-        description: "Password baru dan konfirmasi password tidak sama",
-        variant: "destructive",
-      });
+  const validateForm = (): boolean => {
+    const newErrors: string[] = [];
+
+    // Full name validation
+    if (!validateInput(profileData.full_name, 'name')) {
+      newErrors.push('Please enter a valid full name (letters, spaces, hyphens, and dots only)');
+    }
+
+    // Phone validation (optional but must be valid if provided)
+    if (profileData.phone && !validateInput(profileData.phone, 'phone')) {
+      newErrors.push('Please enter a valid phone number');
+    }
+
+    // Address validation (optional but must be valid if provided)
+    if (profileData.address && !validateInput(profileData.address, 'text')) {
+      newErrors.push('Please enter a valid address');
+    }
+
+    setErrors(newErrors);
+    return newErrors.length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!user) return;
+    
+    const rateLimitKey = `profile_update_${user.id}`;
+    
+    if (!checkRateLimit(rateLimitKey)) {
+      setErrors(['Too many update attempts. Please try again later.']);
       return;
     }
 
-    if (data.new_password.length < 6) {
-      toast({
-        title: "Error",
-        description: "Password harus minimal 6 karakter",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!validateForm()) return;
 
-    setPasswordLoading(true);
+    setSaving(true);
+    setErrors([]);
+
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: data.new_password
-      });
+      const sanitizedData = {
+        full_name: sanitizeInput(profileData.full_name),
+        phone: sanitizeInput(profileData.phone),
+        address: sanitizeInput(profileData.address)
+      };
+
+      const { error } = await supabase
+        .from('profiles')
+        .update(sanitizedData)
+        .eq('id', user.id);
 
       if (error) {
-        throw error;
+        console.error('Error updating profile:', error);
+        setErrors(['Failed to update profile. Please try again.']);
+        return;
       }
 
       toast({
-        title: "Berhasil",
-        description: "Password berhasil diubah",
+        title: "Success",
+        description: "Profile updated successfully",
       });
 
-      passwordForm.reset();
+      // Update local state with sanitized data
+      setProfileData(sanitizedData);
     } catch (error) {
-      console.error('Error updating password:', error);
-      toast({
-        title: "Error",
-        description: "Gagal mengubah password",
-        variant: "destructive",
-      });
+      console.error('Error updating profile:', error);
+      setErrors(['An unexpected error occurred. Please try again.']);
     } finally {
-      setPasswordLoading(false);
+      setSaving(false);
     }
   };
 
+  const handleInputChange = (field: keyof ProfileData, value: string) => {
+    // Basic length limits
+    const maxLengths = {
+      full_name: 100,
+      phone: 20,
+      address: 500
+    };
+
+    if (value.length > maxLengths[field]) {
+      return;
+    }
+
+    setProfileData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const remainingAttempts = getRemainingAttempts(`profile_update_${user?.id}`);
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <div className="space-y-6">
-      {/* Profile Form */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <User className="h-5 w-5 mr-2" />
-            Informasi Profile
-          </CardTitle>
-          <CardDescription>
-            Ubah informasi profile Anda
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...profileForm}>
-            <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-4">
-              <FormField
-                control={profileForm.control}
-                name="full_name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nama Lengkap</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Masukkan nama lengkap" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center">
+          <User className="h-5 w-5 mr-2" />
+          Profile Information
+        </CardTitle>
+        <CardDescription>
+          Update your personal information and contact details
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="full_name">Full Name *</Label>
+            <Input
+              id="full_name"
+              type="text"
+              value={profileData.full_name}
+              onChange={(e) => handleInputChange('full_name', e.target.value)}
+              placeholder="Enter your full name"
+              maxLength={100}
+              required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="phone">Phone Number</Label>
+            <div className="relative">
+              <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Input
+                id="phone"
+                type="tel"
+                value={profileData.phone}
+                onChange={(e) => handleInputChange('phone', e.target.value)}
+                placeholder="Enter your phone number"
+                className="pl-10"
+                maxLength={20}
               />
+            </div>
+          </div>
 
-              <FormField
-                control={profileForm.control}
-                name="phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nomor Telepon</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Masukkan nomor telepon" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+          <div className="space-y-2">
+            <Label htmlFor="address">Address</Label>
+            <div className="relative">
+              <MapPin className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Textarea
+                id="address"
+                value={profileData.address}
+                onChange={(e) => handleInputChange('address', e.target.value)}
+                placeholder="Enter your address"
+                className="pl-10 min-h-[100px]"
+                maxLength={500}
               />
+            </div>
+          </div>
 
-              <FormField
-                control={profileForm.control}
-                name="address"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Alamat</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Masukkan alamat" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+          {errors.length > 0 && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                <ul className="list-disc pl-4 space-y-1">
+                  {errors.map((error, index) => (
+                    <li key={index}>{error}</li>
+                  ))}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
 
-              <Button type="submit" disabled={loading}>
-                {loading ? 'Menyimpan...' : 'Simpan Profile'}
-              </Button>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
+          {remainingAttempts < 10 && remainingAttempts > 0 && (
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                {remainingAttempts} update{remainingAttempts !== 1 ? 's' : ''} remaining in this session
+              </AlertDescription>
+            </Alert>
+          )}
 
-      {/* Password Form */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <Settings className="h-5 w-5 mr-2" />
-            Ubah Password
-          </CardTitle>
-          <CardDescription>
-            Ubah password akun Anda
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...passwordForm}>
-            <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-4">
-              <FormField
-                control={passwordForm.control}
-                name="new_password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Password Baru</FormLabel>
-                    <FormControl>
-                      <Input type="password" placeholder="Masukkan password baru" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={passwordForm.control}
-                name="confirm_password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Konfirmasi Password Baru</FormLabel>
-                    <FormControl>
-                      <Input type="password" placeholder="Konfirmasi password baru" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <Button type="submit" disabled={passwordLoading}>
-                {passwordLoading ? 'Mengubah...' : 'Ubah Password'}
-              </Button>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
-    </div>
+          <Button
+            type="submit"
+            disabled={saving || remainingAttempts === 0}
+            className="w-full"
+          >
+            {saving ? 'Saving...' : 'Update Profile'}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 };
