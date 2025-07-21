@@ -1,4 +1,3 @@
-
 import { useEffect } from 'react';
 import { Toaster } from '@/components/ui/toaster';
 import { Toaster as Sonner } from '@/components/ui/sonner';
@@ -37,20 +36,14 @@ const queryClient = new QueryClient({
   },
 });
 
-// Security headers component
+// Fixed Security headers component with less restrictive CSP
 const SecurityHeaders = () => {
   useEffect(() => {
-    // Add Content Security Policy
+    // Add a more permissive Content Security Policy that won't break navigation
     const meta = document.createElement('meta');
     meta.httpEquiv = 'Content-Security-Policy';
-    meta.content = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://app.midtrans.com https://api.midtrans.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://ymfjbcyqgnokjyvezohk.supabase.co https://api.midtrans.com wss://ymfjbcyqgnokjyvezohk.supabase.co; frame-src 'self' https://app.midtrans.com;";
+    meta.content = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://app.midtrans.com https://api.midtrans.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https: blob:; connect-src 'self' https://ymfjbcyqgnokjyvezohk.supabase.co https://api.midtrans.com wss://ymfjbcyqgnokjyvezohk.supabase.co; frame-src 'self' https://app.midtrans.com; object-src 'none'; base-uri 'self';";
     document.head.appendChild(meta);
-
-    // Add X-Frame-Options
-    const frameOptions = document.createElement('meta');
-    frameOptions.httpEquiv = 'X-Frame-Options';
-    frameOptions.content = 'DENY';
-    document.head.appendChild(frameOptions);
 
     // Add X-Content-Type-Options
     const contentType = document.createElement('meta');
@@ -65,10 +58,10 @@ const SecurityHeaders = () => {
     document.head.appendChild(referrer);
 
     return () => {
-      document.head.removeChild(meta);
-      document.head.removeChild(frameOptions);
-      document.head.removeChild(contentType);
-      document.head.removeChild(referrer);
+      // Clean up on unmount
+      if (document.head.contains(meta)) document.head.removeChild(meta);
+      if (document.head.contains(contentType)) document.head.removeChild(contentType);
+      if (document.head.contains(referrer)) document.head.removeChild(referrer);
     };
   }, []);
 
