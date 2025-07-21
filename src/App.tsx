@@ -1,3 +1,4 @@
+
 import { useEffect } from 'react';
 import { Toaster } from '@/components/ui/toaster';
 import { Toaster as Sonner } from '@/components/ui/sonner';
@@ -7,6 +8,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from '@/components/AuthProvider';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
+import { Navbar } from '@/components/Navbar';
+import AdminNavbar from '@/components/AdminNavbar';
 import MidtransScript from '@/components/MidtransScript';
 import Index from '@/pages/Index';
 import Auth from '@/pages/Auth';
@@ -36,36 +39,28 @@ const queryClient = new QueryClient({
   },
 });
 
-// Fixed Security headers component with less restrictive CSP
-const SecurityHeaders = () => {
-  useEffect(() => {
-    // Add a more permissive Content Security Policy that won't break navigation
-    const meta = document.createElement('meta');
-    meta.httpEquiv = 'Content-Security-Policy';
-    meta.content = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://app.midtrans.com https://api.midtrans.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https: blob:; connect-src 'self' https://ymfjbcyqgnokjyvezohk.supabase.co https://api.midtrans.com wss://ymfjbcyqgnokjyvezohk.supabase.co; frame-src 'self' https://app.midtrans.com; object-src 'none'; base-uri 'self';";
-    document.head.appendChild(meta);
-
-    // Add X-Content-Type-Options
-    const contentType = document.createElement('meta');
-    contentType.httpEquiv = 'X-Content-Type-Options';
-    contentType.content = 'nosniff';
-    document.head.appendChild(contentType);
-
-    // Add Referrer-Policy
-    const referrer = document.createElement('meta');
-    referrer.name = 'referrer';
-    referrer.content = 'strict-origin-when-cross-origin';
-    document.head.appendChild(referrer);
-
-    return () => {
-      // Clean up on unmount
-      if (document.head.contains(meta)) document.head.removeChild(meta);
-      if (document.head.contains(contentType)) document.head.removeChild(contentType);
-      if (document.head.contains(referrer)) document.head.removeChild(referrer);
-    };
-  }, []);
-
-  return null;
+// Layout component with proper navbar
+const Layout = ({ children }: { children: React.ReactNode }) => {
+  const { role } = useUserRole();
+  const location = window.location.pathname;
+  
+  // Show AdminNavbar for admin routes
+  if (location.startsWith('/admin')) {
+    return (
+      <>
+        <AdminNavbar />
+        {children}
+      </>
+    );
+  }
+  
+  // Show regular Navbar for all other authenticated routes
+  return (
+    <>
+      <Navbar />
+      {children}
+    </>
+  );
 };
 
 // Protected Route component
@@ -89,7 +84,11 @@ const ProtectedRoute = ({ children, allowedRoles = [] }: { children: React.React
     return <Navigate to="/" replace />;
   }
 
-  return <>{children}</>;
+  return (
+    <Layout>
+      {children}
+    </Layout>
+  );
 };
 
 // App routes component
@@ -203,7 +202,6 @@ function App() {
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <SecurityHeaders />
         <BrowserRouter>
           <AuthProvider>
             <AppRoutes />
