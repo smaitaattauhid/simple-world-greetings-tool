@@ -65,10 +65,12 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
 
 // Protected Route component
 const ProtectedRoute = ({ children, allowedRoles = [] }: { children: React.ReactNode; allowedRoles?: string[] }) => {
-  const { user, loading } = useAuth();
-  const { role, loading: roleLoading } = useUserRole();
+  const { user, loading: authLoading } = useAuth();
+  const { role, loading: roleLoading, isAdmin, isCashier } = useUserRole();
 
-  if (loading || roleLoading) {
+  console.log('ProtectedRoute: Current state', { user: !!user, role, authLoading, roleLoading, allowedRoles });
+
+  if (authLoading || roleLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
@@ -77,11 +79,20 @@ const ProtectedRoute = ({ children, allowedRoles = [] }: { children: React.React
   }
 
   if (!user) {
+    console.log('ProtectedRoute: No user, redirecting to auth');
     return <Navigate to="/auth" replace />;
   }
 
-  if (allowedRoles.length > 0 && role && !allowedRoles.includes(role)) {
-    return <Navigate to="/" replace />;
+  if (allowedRoles.length > 0 && role) {
+    console.log('ProtectedRoute: Checking role access', { role, allowedRoles, hasAccess: allowedRoles.includes(role) });
+    
+    // Special handling for cashier routes - admin can also access
+    if (allowedRoles.includes('cashier') && (role === 'admin' || role === 'cashier')) {
+      // Allow access
+    } else if (!allowedRoles.includes(role)) {
+      console.log('ProtectedRoute: Access denied, redirecting to home');
+      return <Navigate to="/" replace />;
+    }
   }
 
   return (

@@ -32,9 +32,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         if (mounted) {
-          console.log('Auth state changed:', event, session?.user?.email || 'no user');
+          console.log('AuthProvider: Auth state changed:', event, session?.user?.email || 'no user');
           setSession(session);
           setUser(session?.user ?? null);
           setLoading(false);
@@ -47,16 +47,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
         if (error) {
-          console.error('Error getting session:', error);
+          console.error('AuthProvider: Error getting session:', error);
         }
         if (mounted) {
-          console.log('Initial session:', session?.user?.email || 'no session');
+          console.log('AuthProvider: Initial session:', session?.user?.email || 'no session');
           setSession(session);
           setUser(session?.user ?? null);
           setLoading(false);
         }
       } catch (error) {
-        console.error('Error in getInitialSession:', error);
+        console.error('AuthProvider: Error in getInitialSession:', error);
         if (mounted) {
           setLoading(false);
         }
@@ -79,7 +79,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       return { error };
     } catch (error) {
-      console.error('Sign in error:', error);
+      console.error('AuthProvider: Sign in error:', error);
       return { error };
     }
   };
@@ -97,7 +97,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       return { error };
     } catch (error) {
-      console.error('Sign up error:', error);
+      console.error('AuthProvider: Sign up error:', error);
       return { error };
     }
   };
@@ -106,12 +106,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const { error } = await supabase.auth.signOut();
       if (error) {
-        console.error('Sign out error:', error);
+        console.error('AuthProvider: Sign out error:', error);
       }
       setUser(null);
       setSession(null);
     } catch (error) {
-      console.error('Sign out error:', error);
+      console.error('AuthProvider: Sign out error:', error);
     }
   };
 

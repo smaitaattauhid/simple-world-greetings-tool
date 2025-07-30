@@ -37,7 +37,7 @@ export const Navbar = () => {
 
   const handleSignOut = async () => {
     await signOut();
-    navigate('/login');
+    navigate('/auth');
   };
 
   const getNavItems = () => {
@@ -45,11 +45,11 @@ export const Navbar = () => {
       return [
         { path: '/admin', label: 'Dashboard', icon: BarChart3 },
         { path: '/admin/food-management', label: 'Kelola Menu', icon: UtensilsCrossed },
-        { path: '/admin/order-management', label: 'Kelola Pesanan', icon: ShoppingCart },
-        { path: '/admin/order-recap', label: 'Rekapitulasi', icon: FileText },
+        { path: '/admin/orders', label: 'Kelola Pesanan', icon: ShoppingCart },
+        { path: '/admin/recap', label: 'Rekapitulasi', icon: FileText },
         { path: '/admin/reports', label: 'Laporan', icon: TrendingUp },
-        { path: '/admin/schedule-management', label: 'Jadwal', icon: Calendar },
-        { path: '/admin/populate-daily-menus', label: 'Isi Menu Harian', icon: Plus },
+        { path: '/admin/schedule', label: 'Jadwal', icon: Calendar },
+        { path: '/admin/populate-menus', label: 'Isi Menu Harian', icon: Plus },
         { path: '/admin/user-management', label: 'Kelola Pengguna', icon: UserCog },
         { path: '/admin/student-management', label: 'Kelola Siswa', icon: GraduationCap },
         { path: '/profile', label: 'Profile Saya', icon: User },
@@ -65,6 +65,7 @@ export const Navbar = () => {
         { path: '/', label: 'Beranda', icon: Home },
         { path: '/orders', label: 'Pesanan Saya', icon: ShoppingCart },
         { path: '/children', label: 'Data Anak', icon: Users },
+        { path: '/batch-orders', label: 'Pesanan Batch', icon: Calendar },
         { path: '/profile', label: 'Profile Saya', icon: User },
       ];
     }

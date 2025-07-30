@@ -140,6 +140,15 @@ const Index = () => {
       return;
     }
 
+    if (!user?.id) {
+      toast({
+        title: "Error",
+        description: "User tidak terautentikasi",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       // Group cart items by date and child
       const ordersByDate = cart.reduce((acc, item) => {
@@ -164,24 +173,32 @@ const Index = () => {
         // Generate unique order ID
         const midtransOrderId = `ORDER-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-        // Create order
+        // Create order with all required fields for RLS policy
+        const orderData = {
+          user_id: user.id,
+          created_by: user.id,  // Add this field which is required by RLS
+          order_number: midtransOrderId,
+          child_name: selectedChildData?.name || null,
+          child_class: selectedChildData?.class_name || null,
+          total_amount: totalAmount,
+          delivery_date: orderGroup.date,
+          midtrans_order_id: midtransOrderId,
+          status: 'pending',
+          payment_status: 'pending'
+        };
+
+        console.log('Creating order with data:', orderData);
+
         const { data: order, error: orderError } = await supabase
           .from('orders')
-          .insert({
-            user_id: user?.id,
-            order_number: midtransOrderId,
-            child_name: selectedChildData?.name,
-            child_class: selectedChildData?.class_name,
-            total_amount: totalAmount,
-            delivery_date: orderGroup.date,
-            midtrans_order_id: midtransOrderId,
-            status: 'pending',
-            payment_status: 'pending'
-          })
+          .insert(orderData)
           .select()
           .single();
 
-        if (orderError) throw orderError;
+        if (orderError) {
+          console.error('Order creation error:', orderError);
+          throw orderError;
+        }
 
         // Create order items using the correct menu_item_id from the cart items
         const orderItems = orderGroup.items.map((item: CartItem) => ({
@@ -195,7 +212,10 @@ const Index = () => {
           .from('order_items')
           .insert(orderItems);
 
-        if (itemsError) throw itemsError;
+        if (itemsError) {
+          console.error('Order items creation error:', itemsError);
+          throw itemsError;
+        }
 
         console.log('Order created successfully:', order);
       }

@@ -1,29 +1,18 @@
 
 import React from 'react';
 
-interface DetailOrder {
+interface MenuRecapData {
   id: string;
-  child_name: string;
-  child_class: string;
   menu_name: string;
-  item_code: string;
   quantity: number;
-  kitchen_check: boolean;
-  homeroom_check: boolean;
-  delivery_date: string;
-  total_amount: number;
-  payment_status: string;
 }
 
-interface DetailOrdersPrintProps {
-  data: DetailOrder[];
+interface MenuRecapPrintProps {
+  data: MenuRecapData[];
   printerType?: string;
 }
 
-export const DetailOrdersPrint: React.FC<DetailOrdersPrintProps> = ({ 
-  data, 
-  printerType = 'standard' 
-}) => {
+export const MenuRecapPrint: React.FC<MenuRecapPrintProps> = ({ data, printerType = 'standard' }) => {
   const printStyles = {
     standard: {
       fontSize: '12px',
@@ -32,13 +21,13 @@ export const DetailOrdersPrint: React.FC<DetailOrdersPrintProps> = ({
       fontFamily: 'Arial, sans-serif'
     },
     thermal: {
-      fontSize: '9px',
+      fontSize: '10px',
       pageWidth: '80mm',
-      margin: '3mm',
+      margin: '5mm',
       fontFamily: 'Arial, sans-serif'
     },
     dotmatrix: {
-      fontSize: '8px',
+      fontSize: '9px',
       pageWidth: '216mm',
       margin: '10mm',
       fontFamily: 'Courier, monospace'
@@ -47,28 +36,17 @@ export const DetailOrdersPrint: React.FC<DetailOrdersPrintProps> = ({
 
   const currentStyle = printStyles[printerType as keyof typeof printStyles] || printStyles.standard;
 
-  const getPaymentStatusText = (status: string) => {
-    switch (status) {
-      case 'paid': return 'Lunas';
-      case 'pending': return 'Belum Bayar';
-      case 'failed': return 'Gagal';
-      case 'refunded': return 'Refund';
-      default: return status;
-    }
-  };
-
   React.useEffect(() => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
-    const totalAmount = data.reduce((sum, order) => sum + order.total_amount, 0);
-    const paidOrders = data.filter(order => order.payment_status === 'paid').length;
+    const totalItems = data.reduce((sum, item) => sum + item.quantity, 0);
 
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Detail Pesanan</title>
+          <title>Rekapitulasi Menu</title>
           <style>
             @page {
               size: ${currentStyle.pageWidth};
@@ -77,12 +55,12 @@ export const DetailOrdersPrint: React.FC<DetailOrdersPrintProps> = ({
             body {
               font-family: ${currentStyle.fontFamily};
               font-size: ${currentStyle.fontSize};
-              line-height: 1.3;
+              line-height: 1.4;
             }
             table { 
               width: 100%; 
               border-collapse: collapse; 
-              margin-bottom: 15px;
+              margin-bottom: 20px;
             }
             th, td { 
               border: 1px solid #000; 
@@ -95,16 +73,14 @@ export const DetailOrdersPrint: React.FC<DetailOrdersPrintProps> = ({
             }
             .text-center { text-align: center; }
             .text-right { text-align: right; }
-            .status-paid { color: green; }
-            .status-pending { color: orange; }
             .summary { 
-              margin-top: 15px; 
-              padding: 8px; 
+              margin-top: 20px; 
+              padding: 10px; 
               border: 1px solid #000; 
             }
             .header {
               text-align: center;
-              margin-bottom: 15px;
+              margin-bottom: 20px;
             }
             @media print {
               body { margin: 0; }
@@ -113,7 +89,7 @@ export const DetailOrdersPrint: React.FC<DetailOrdersPrintProps> = ({
         </head>
         <body>
           <div class="header">
-            <h2>DETAIL PESANAN</h2>
+            <h2>REKAPITULASI PESANAN</h2>
             <p>Berdasarkan Tanggal Katering</p>
             <p>Dicetak: ${new Date().toLocaleString('id-ID')}</p>
           </div>
@@ -122,30 +98,16 @@ export const DetailOrdersPrint: React.FC<DetailOrdersPrintProps> = ({
             <thead>
               <tr>
                 <th>Nomor Urut</th>
-                <th>Nama Siswa</th>
-                <th>Kelas</th>
                 <th>Nama Pesanan</th>
-                <th>Kode Item</th>
                 <th class="text-center">Jumlah</th>
-                <th class="text-center">Ceklist Dapur</th>
-                <th class="text-center">Ceklist Walikelas</th>
               </tr>
             </thead>
             <tbody>
-              ${data.map((order, index) => `
+              ${data.map((item, index) => `
                 <tr>
                   <td class="text-center">${index + 1}</td>
-                  <td>${order.child_name}</td>
-                  <td>${order.child_class}</td>
-                  <td>${order.menu_name}</td>
-                  <td>${order.item_code}</td>
-                  <td class="text-center">${order.quantity}</td>
-                  <td class="text-center">
-                    <input type="checkbox" ${order.kitchen_check ? 'checked' : ''} />
-                  </td>
-                  <td class="text-center">
-                    <input type="checkbox" ${order.homeroom_check ? 'checked' : ''} />
-                  </td>
+                  <td>${item.menu_name}</td>
+                  <td class="text-center">${item.quantity}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -153,9 +115,8 @@ export const DetailOrdersPrint: React.FC<DetailOrdersPrintProps> = ({
           
           <div class="summary">
             <h3>RINGKASAN</h3>
-            <p>Total Detail Pesanan: ${data.length}</p>
-            <p>Total Jumlah: ${data.reduce((sum, item) => sum + item.quantity, 0)}</p>
-            <p>Jumlah Siswa: ${new Set(data.map(item => item.child_name)).size}</p>
+            <p>Total Jenis Menu: ${data.length}</p>
+            <p>Total Jumlah Pesanan: ${totalItems}</p>
           </div>
           
           <script>

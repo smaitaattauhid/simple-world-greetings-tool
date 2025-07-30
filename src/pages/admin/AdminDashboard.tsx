@@ -15,6 +15,8 @@ import { Settings, ShoppingBag, Package, BarChart3, CreditCard } from 'lucide-re
 const AdminDashboard = () => {
   const { role, loading, isAdmin } = useUserRole();
 
+  console.log('AdminDashboard: Current role state', { role, loading, isAdmin });
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -24,14 +26,20 @@ const AdminDashboard = () => {
   }
 
   if (!isAdmin) {
+    console.log('AdminDashboard: Access denied - not admin', { role, isAdmin });
     return (
       <div className="max-w-2xl mx-auto p-6 text-center">
         <Card>
           <CardContent className="p-8">
-            <h1 className="text-2xl font-bold text-red-600 mb-4">Access Denied</h1>
-            <p className="text-gray-600">
-              You don't have permission to access the admin dashboard. 
-              Please contact an administrator if you believe this is an error.
+            <h1 className="text-2xl font-bold text-red-600 mb-4">Akses Ditolak</h1>
+            <p className="text-gray-600 mb-4">
+              Anda tidak memiliki izin untuk mengakses dashboard admin.
+            </p>
+            <p className="text-sm text-gray-500">
+              Role saat ini: {role || 'Tidak diketahui'}
+            </p>
+            <p className="text-sm text-gray-500">
+              Silakan hubungi administrator jika Anda yakin ini adalah kesalahan.
             </p>
           </CardContent>
         </Card>
@@ -45,7 +53,8 @@ const AdminDashboard = () => {
         <h1 className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
           Admin Dashboard
         </h1>
-        <p className="text-gray-600 mt-2">Manage your restaurant's menu, orders, and categories</p>
+        <p className="text-gray-600 mt-2">Kelola menu, pesanan, dan kategori restoran</p>
+        <p className="text-sm text-gray-500 mt-1">Role: {role}</p>
       </div>
 
       <Tabs defaultValue="overview" className="space-y-6">

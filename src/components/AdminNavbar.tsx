@@ -1,7 +1,7 @@
 
 import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { LayoutDashboard, Utensils, ShoppingBag, Calendar, FileText, LogOut, Menu, X, Plus, BarChart3, GraduationCap } from "lucide-react";
+import { LayoutDashboard, Utensils, ShoppingBag, Calendar, FileText, LogOut, Menu, X, Plus, BarChart3, GraduationCap, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -34,28 +34,33 @@ const AdminNavbar = () => {
     },
     {
       name: "Manajemen Pesanan",
-      href: "/admin/order-management",
+      href: "/admin/orders",
       icon: ShoppingBag,
     },
     {
       name: "Jadwal & Kuota",
-      href: "/admin/schedule-management",
+      href: "/admin/schedule",
       icon: Calendar,
     },
     {
       name: "Populate Daily Menus",
-      href: "/admin/populate-daily-menus",
+      href: "/admin/populate-menus",
       icon: Plus,
     },
     {
       name: "Rekapitulasi",
-      href: "/admin/order-recap",
+      href: "/admin/recap",
       icon: BarChart3,
     },
     {
       name: "Laporan",
       href: "/admin/reports",
       icon: FileText,
+    },
+    {
+      name: "Kelola Pengguna",
+      href: "/admin/user-management",
+      icon: Users,
     },
     {
       name: "Kelola Siswa",
