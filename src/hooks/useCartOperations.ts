@@ -18,7 +18,7 @@ export const useCartOperations = () => {
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
-  const { settings: paymentSettings } = usePaymentSettings();
+  const { settings: paymentSettings, calculateQRISAdminFee } = usePaymentSettings();
 
   useEffect(() => {
     // Load Midtrans Snap script
@@ -111,12 +111,13 @@ export const useCartOperations = () => {
       // Create order first - payment_method will be determined by Midtrans setting
       const orderData = {
         user_id: user?.id,
+        created_by: user?.id || '', // Fix: Add the missing created_by field
         total_amount: totalAmount,
         admin_fee: adminFee,
         notes: notes || null,
         status: 'pending',
         payment_status: paymentSettings.midtransEnabled ? 'pending' : 'pending_cash',
-        payment_method: paymentSettings.midtransEnabled ? 'midtrans' : 'cash',
+        payment_method: paymentSettings.midtransEnabled ? 'qris' : 'cash', // Changed to qris for QRIS-only
         order_number: orderId,
         child_name: selectedChild?.name || null,
         child_class: selectedChild?.class_name || null,
@@ -149,7 +150,7 @@ export const useCartOperations = () => {
 
       // Check if Midtrans is enabled AFTER order creation but before proceeding with payment
       if (paymentSettings.midtransEnabled) {
-        console.log('useCartOperations: Midtrans enabled, proceeding with online payment');
+        console.log('useCartOperations: Midtrans enabled, proceeding with QRIS payment');
         
         // Prepare payment data
         const customerDetails = {
@@ -168,14 +169,14 @@ export const useCartOperations = () => {
         // Add admin fee as separate item if applicable
         if (adminFee > 0) {
           itemDetails.push({
-            id: 'admin_fee',
+            id: 'qris_admin_fee',
             price: adminFee,
             quantity: 1,
-            name: 'Biaya Admin',
+            name: 'Biaya Admin QRIS',
           });
         }
 
-        // Create payment transaction
+        // Create payment transaction with QRIS-only
         const { data: paymentData, error: paymentError } = await supabase.functions.invoke(
           'create-payment',
           {
@@ -184,6 +185,7 @@ export const useCartOperations = () => {
               amount: totalAmount,
               customerDetails,
               itemDetails,
+              paymentMethod: 'qris', // Force QRIS only
             },
           }
         );
@@ -194,34 +196,34 @@ export const useCartOperations = () => {
         if (window.snap && paymentData.snap_token) {
           window.snap.pay(paymentData.snap_token, {
             onSuccess: (result) => {
-              console.log('Payment success:', result);
+              console.log('QRIS Payment success:', result);
               toast({
-                title: "Pembayaran Berhasil!",
+                title: "Pembayaran QRIS Berhasil!",
                 description: "Pesanan Anda telah dikonfirmasi dan sedang diproses.",
               });
               onSuccess();
             },
             onPending: (result) => {
-              console.log('Payment pending:', result);
+              console.log('QRIS Payment pending:', result);
               toast({
-                title: "Menunggu Pembayaran",
-                description: "Pembayaran Anda sedang diproses. Mohon tunggu konfirmasi.",
+                title: "Menunggu Pembayaran QRIS",
+                description: "Pembayaran QRIS Anda sedang diproses. Mohon tunggu konfirmasi.",
               });
               onSuccess();
             },
             onError: (result) => {
-              console.error('Payment error:', result);
+              console.error('QRIS Payment error:', result);
               toast({
-                title: "Pembayaran Gagal",
-                description: "Terjadi kesalahan dalam proses pembayaran. Silakan coba lagi.",
+                title: "Pembayaran QRIS Gagal",
+                description: "Terjadi kesalahan dalam proses pembayaran QRIS. Silakan coba lagi.",
                 variant: "destructive",
               });
             },
             onClose: () => {
-              console.log('Payment popup closed');
+              console.log('QRIS Payment popup closed');
               toast({
                 title: "Pembayaran Dibatalkan",
-                description: "Anda membatalkan proses pembayaran.",
+                description: "Anda membatalkan proses pembayaran QRIS.",
               });
             }
           });

@@ -99,6 +99,7 @@ export const usePaymentSettings = () => {
     };
   }, []);
 
+  // Legacy method for backward compatibility
   const calculateAdminFee = (amount: number, paymentMethod: 'midtrans' | 'cash' = 'midtrans') => {
     // Only calculate admin fee if Midtrans is enabled and payment method is midtrans
     if (paymentMethod === 'cash' || !settings.midtransEnabled) {
@@ -110,8 +111,36 @@ export const usePaymentSettings = () => {
     return fee;
   };
 
+  // New QRIS admin fee calculation with specific rules
+  const calculateQRISAdminFee = (amount: number, paymentMethod: 'qris' | 'cash' = 'qris') => {
+    // Only calculate admin fee if Midtrans is enabled and payment method is QRIS
+    if (paymentMethod === 'cash' || !settings.midtransEnabled) {
+      console.log('usePaymentSettings: No admin fee - cash payment or Midtrans disabled');
+      return 0;
+    }
+
+    let fee = 0;
+    
+    if (amount < 628000) {
+      // If total transaction is less than 628,000, admin fee is 0.07% of total
+      fee = Math.round(amount * 0.0007); // 0.07%
+    } else {
+      // If total transaction is 628,000 or more, admin fee is fixed at Rp 4,400
+      fee = 4400;
+    }
+
+    console.log('usePaymentSettings: Calculated QRIS admin fee:', fee, 'for amount:', amount);
+    return fee;
+  };
+
   const calculateTotalWithFee = (amount: number, paymentMethod: 'midtrans' | 'cash' = 'midtrans') => {
     const adminFee = calculateAdminFee(amount, paymentMethod);
+    return amount + adminFee;
+  };
+
+  // New method for QRIS total calculation
+  const calculateQRISTotalWithFee = (amount: number, paymentMethod: 'qris' | 'cash' = 'qris') => {
+    const adminFee = calculateQRISAdminFee(amount, paymentMethod);
     return amount + adminFee;
   };
 
@@ -119,7 +148,9 @@ export const usePaymentSettings = () => {
     settings,
     loading,
     calculateAdminFee,
+    calculateQRISAdminFee,
     calculateTotalWithFee,
+    calculateQRISTotalWithFee,
     refetch: fetchSettings
   };
 };

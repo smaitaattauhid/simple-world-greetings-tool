@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -6,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Settings, CreditCard, Percent } from 'lucide-react';
+import { Settings, CreditCard, Percent, QrCode } from 'lucide-react';
 
 export const PaymentSettings = () => {
   const [midtransEnabled, setMidtransEnabled] = useState(true);
@@ -68,8 +69,8 @@ export const PaymentSettings = () => {
             key,
             value,
             description: key === 'midtrans_enabled' 
-              ? 'Enable/disable Midtrans payment method' 
-              : 'Admin fee percentage for Midtrans payments',
+              ? 'Enable/disable Midtrans QRIS payment method' 
+              : 'Admin fee percentage for Midtrans QRIS payments',
             updated_at: new Date().toISOString()
           },
           {
@@ -102,7 +103,7 @@ export const PaymentSettings = () => {
       
       toast({
         title: "Berhasil",
-        description: `Pembayaran Midtrans ${enabled ? 'diaktifkan' : 'dinonaktifkan'}`,
+        description: `Pembayaran QRIS ${enabled ? 'diaktifkan' : 'dinonaktifkan'}`,
       });
       
       console.log('PaymentSettings: Toggle successful');
@@ -110,7 +111,7 @@ export const PaymentSettings = () => {
       console.error('PaymentSettings: Toggle failed:', error);
       toast({
         title: "Error",
-        description: "Gagal mengubah pengaturan Midtrans. Silakan coba lagi.",
+        description: "Gagal mengubah pengaturan QRIS. Silakan coba lagi.",
         variant: "destructive",
       });
       // Revert the toggle state on error
@@ -156,7 +157,7 @@ export const PaymentSettings = () => {
         <CardHeader>
           <CardTitle className="flex items-center">
             <Settings className="h-5 w-5 mr-2" />
-            Pengaturan Pembayaran
+            Pengaturan Pembayaran QRIS
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -175,19 +176,19 @@ export const PaymentSettings = () => {
       <CardHeader>
         <CardTitle className="flex items-center">
           <Settings className="h-5 w-5 mr-2" />
-          Pengaturan Pembayaran
+          Pengaturan Pembayaran QRIS
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Midtrans Toggle */}
+        {/* QRIS Toggle */}
         <div className="flex items-center justify-between p-4 border rounded-lg">
           <div className="flex items-center space-x-3">
-            <CreditCard className="h-5 w-5 text-blue-600" />
+            <QrCode className="h-5 w-5 text-blue-600" />
             <div>
-              <h3 className="font-medium">Pembayaran Midtrans</h3>
+              <h3 className="font-medium">Pembayaran QRIS</h3>
               <p className="text-sm text-gray-600">
                 {midtransEnabled 
-                  ? 'Orang tua dapat membayar melalui Midtrans'
+                  ? 'Orang tua dapat membayar melalui QRIS (Snap)'
                   : 'Hanya pembayaran tunai yang tersedia'
                 }
               </p>
@@ -200,21 +201,36 @@ export const PaymentSettings = () => {
           />
         </div>
 
-        {/* Admin Fee Setting */}
+        {/* QRIS Admin Fee Structure */}
         <div className="p-4 border rounded-lg">
           <div className="flex items-center space-x-3 mb-4">
             <Percent className="h-5 w-5 text-green-600" />
             <div>
-              <h3 className="font-medium">Biaya Admin Midtrans</h3>
+              <h3 className="font-medium">Struktur Biaya Admin QRIS</h3>
               <p className="text-sm text-gray-600">
-                Biaya admin yang dikenakan untuk pembayaran Midtrans
+                Biaya admin yang dikenakan untuk pembayaran QRIS
               </p>
+            </div>
+          </div>
+
+          {/* QRIS Fee Structure Display */}
+          <div className="bg-blue-50 p-4 rounded-lg mb-4">
+            <h4 className="font-medium text-blue-800 mb-2">Struktur Biaya:</h4>
+            <div className="text-sm text-blue-700 space-y-2">
+              <div className="flex justify-between">
+                <span>Transaksi &lt; Rp 628.000:</span>
+                <span className="font-medium">0,07% dari total</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Transaksi ≥ Rp 628.000:</span>
+                <span className="font-medium">Rp 4.400 (tetap)</span>
+              </div>
             </div>
           </div>
           
           <div className="flex items-end space-x-4">
             <div className="flex-1">
-              <Label htmlFor="admin-fee">Persentase Biaya Admin (%)</Label>
+              <Label htmlFor="admin-fee">Persentase untuk Transaksi Kecil (%)</Label>
               <Input
                 id="admin-fee"
                 type="number"
@@ -227,7 +243,7 @@ export const PaymentSettings = () => {
                 className="mt-1"
               />
               <p className="text-xs text-gray-500 mt-1">
-                Default: 0.07% (untuk menutupi biaya transaksi Midtrans)
+                Default: 0,07% (hanya untuk transaksi &lt; Rp 628.000)
               </p>
             </div>
             <Button
@@ -241,12 +257,13 @@ export const PaymentSettings = () => {
         </div>
 
         <div className="bg-blue-50 p-4 rounded-lg">
-          <h4 className="font-medium text-blue-800 mb-2">Informasi:</h4>
+          <h4 className="font-medium text-blue-800 mb-2">Informasi QRIS:</h4>
           <ul className="text-sm text-blue-700 space-y-1">
             <li>• Pembayaran tunai tidak dikenakan biaya admin</li>
-            <li>• Biaya admin Midtrans akan ditambahkan ke total pesanan</li>
-            <li>• Perubahan pengaturan akan berlaku untuk pesanan baru</li>
-            <li>• Jika Midtrans dinonaktifkan, hanya kasir yang dapat memproses pembayaran</li>
+            <li>• Biaya admin QRIS otomatis dihitung berdasarkan total transaksi</li>
+            <li>• Pembayaran dibatasi hanya ke QRIS (tidak ada metode lain)</li>
+            <li>• Biaya transparan ditampilkan kepada pengguna sebelum bayar</li>
+            <li>• Jika QRIS dinonaktifkan, hanya kasir yang dapat memproses pembayaran</li>
           </ul>
         </div>
       </CardContent>

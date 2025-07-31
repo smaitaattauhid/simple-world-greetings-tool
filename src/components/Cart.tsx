@@ -29,7 +29,7 @@ interface CartProps {
 
 const Cart = ({ items, onUpdateCart }: CartProps) => {
   const [isOpen, setIsOpen] = useState(false);
-  const { settings: paymentSettings, loading: paymentSettingsLoading, calculateAdminFee, refetch: refetchPaymentSettings } = usePaymentSettings();
+  const { settings: paymentSettings, loading: paymentSettingsLoading, calculateQRISAdminFee, refetch: refetchPaymentSettings } = usePaymentSettings();
   const {
     children,
     selectedChildId,
@@ -98,13 +98,14 @@ const Cart = ({ items, onUpdateCart }: CartProps) => {
 
   const onCheckout = async () => {
     const subtotal = getSubtotal();
-    // When Midtrans is disabled, don't calculate admin fee for parent orders
-    const adminFee = paymentSettings.midtransEnabled ? calculateAdminFee(subtotal, 'midtrans') : 0;
+    // Use QRIS admin fee calculation when Midtrans is enabled
+    const adminFee = paymentSettings.midtransEnabled ? calculateQRISAdminFee(subtotal, 'qris') : 0;
     
-    console.log('Cart: Checkout with settings:', {
+    console.log('Cart: Checkout with QRIS settings:', {
       midtransEnabled: paymentSettings.midtransEnabled,
       subtotal,
-      adminFee
+      adminFee,
+      feeCalculation: subtotal < 628000 ? '0.07% of total' : 'Fixed Rp 4,400'
     });
     
     await handleCheckout(items, adminFee, () => {
@@ -121,8 +122,8 @@ const Cart = ({ items, onUpdateCart }: CartProps) => {
   }
 
   const subtotal = getSubtotal();
-  // Show admin fee only when Midtrans is enabled
-  const adminFee = paymentSettings.midtransEnabled ? calculateAdminFee(subtotal, 'midtrans') : 0;
+  // Use QRIS admin fee calculation when Midtrans is enabled
+  const adminFee = paymentSettings.midtransEnabled ? calculateQRISAdminFee(subtotal, 'qris') : 0;
   const totalWithFee = subtotal + adminFee;
   const canCheckout = selectedChildId && children.length > 0;
 
@@ -175,11 +176,19 @@ const Cart = ({ items, onUpdateCart }: CartProps) => {
                 <span>{formatPrice(subtotal)}</span>
               </div>
               
-              {/* Only show admin fee if Midtrans is enabled and fee > 0 */}
+              {/* Show QRIS admin fee with transparent calculation */}
               {paymentSettings.midtransEnabled && adminFee > 0 && (
-                <div className="flex justify-between text-sm text-orange-600">
-                  <span>Biaya Admin ({(paymentSettings.adminFeePercentage * 100).toFixed(2)}%):</span>
-                  <span>{formatPrice(adminFee)}</span>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-sm text-orange-600">
+                    <span>Biaya Admin QRIS:</span>
+                    <span>{formatPrice(adminFee)}</span>
+                  </div>
+                  <div className="text-xs text-gray-500 text-right">
+                    {subtotal < 628000 
+                      ? `(0,07% dari ${formatPrice(subtotal)})` 
+                      : '(Tarif tetap untuk transaksi ≥ Rp 628.000)'
+                    }
+                  </div>
                 </div>
               )}
               
@@ -191,7 +200,7 @@ const Cart = ({ items, onUpdateCart }: CartProps) => {
               </div>
             </div>
 
-            {/* Payment Method Information with refresh indicator */}
+            {/* Payment Method Information with QRIS details */}
             {paymentSettingsLoading ? (
               <div className="mt-4 p-3 bg-gray-50 rounded-lg">
                 <div className="flex items-center space-x-2">
@@ -201,12 +210,15 @@ const Cart = ({ items, onUpdateCart }: CartProps) => {
               </div>
             ) : paymentSettings.midtransEnabled ? (
               <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <p className="text-sm text-blue-800">
-                  <strong>✅ Metode Pembayaran:</strong> Midtrans (Online) atau Tunai di Kasir
+                <p className="text-sm text-blue-800 font-medium">
+                  🔵 Metode Pembayaran: QRIS Only
                 </p>
-                <p className="text-xs text-blue-600 mt-1">
-                  * Pembayaran tunai tidak dikenakan biaya admin
-                </p>
+                <div className="text-xs text-blue-600 mt-2 space-y-1">
+                  <p>• Biaya admin QRIS:</p>
+                  <p className="ml-2">- Transaksi &lt; Rp 628.000: 0,07% dari total</p>
+                  <p className="ml-2">- Transaksi ≥ Rp 628.000: Rp 4.400 tetap</p>
+                  <p>• Pembayaran hanya melalui QRIS (Snap)</p>
+                </div>
               </div>
             ) : (
               <div className="mt-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
@@ -239,7 +251,7 @@ const Cart = ({ items, onUpdateCart }: CartProps) => {
                   Memuat...
                 </div>
               ) : paymentSettings.midtransEnabled ? (
-                `Checkout ${formatPrice(totalWithFee)}`
+                `Bayar QRIS ${formatPrice(totalWithFee)}`
               ) : (
                 `Buat Pesanan Tunai ${formatPrice(subtotal)}`
               )}

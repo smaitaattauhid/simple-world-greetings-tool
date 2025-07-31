@@ -14,9 +14,9 @@ serve(async (req) => {
   }
 
   try {
-    const { orderId, amount, customerDetails, itemDetails } = await req.json()
+    const { orderId, amount, customerDetails, itemDetails, paymentMethod } = await req.json()
     
-    console.log('create-payment: Processing payment for order:', orderId, 'amount:', amount)
+    console.log('create-payment: Processing QRIS payment for order:', orderId, 'amount:', amount)
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
@@ -52,6 +52,7 @@ serve(async (req) => {
 
     const auth = btoa(`${midtransServerKey}:`)
     
+    // QRIS-only configuration
     const midtransPayload = {
       transaction_details: {
         order_id: orderId,
@@ -59,12 +60,15 @@ serve(async (req) => {
       },
       customer_details: customerDetails,
       item_details: itemDetails,
+      enabled_payments: ["qris"], // Restrict to QRIS only
       credit_card: {
         secure: true
-      }
+      },
+      custom_field1: paymentMethod || 'qris',
+      custom_field2: 'qris_only_payment'
     }
 
-    console.log('create-payment: Creating Midtrans transaction:', midtransPayload)
+    console.log('create-payment: Creating QRIS-only Midtrans transaction:', midtransPayload)
 
     const midtransResponse = await fetch('https://app.sandbox.midtrans.com/snap/v1/transactions', {
       method: 'POST',
@@ -78,17 +82,18 @@ serve(async (req) => {
 
     if (!midtransResponse.ok) {
       const errorText = await midtransResponse.text()
-      console.error('create-payment: Midtrans error:', errorText)
-      throw new Error(`Midtrans error: ${midtransResponse.status} - ${errorText}`)
+      console.error('create-payment: Midtrans QRIS error:', errorText)
+      throw new Error(`Midtrans QRIS error: ${midtransResponse.status} - ${errorText}`)
     }
 
     const midtransData = await midtransResponse.json()
-    console.log('create-payment: Midtrans response:', midtransData)
+    console.log('create-payment: Midtrans QRIS response:', midtransData)
 
     return new Response(
       JSON.stringify({ 
         snap_token: midtransData.token,
-        redirect_url: midtransData.redirect_url 
+        redirect_url: midtransData.redirect_url,
+        payment_method: 'qris'
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -96,7 +101,7 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('create-payment: Error:', error)
+    console.error('create-payment: QRIS Error:', error)
     return new Response(
       JSON.stringify({ error: error.message }),
       { 
