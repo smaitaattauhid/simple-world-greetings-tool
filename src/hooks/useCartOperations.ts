@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -24,7 +23,7 @@ export const useCartOperations = () => {
     // Load Midtrans Snap script
     const script = document.createElement('script');
     script.src = 'https://app.sandbox.midtrans.com/snap/snap.js';
-    script.setAttribute('data-client-key', 'SB-Mid-client-your-client-key-here');
+    script.setAttribute('data-client-key', 'SB-Mid-client-wUSl3kzaq68k75u7JXtznOBq');
     document.body.appendChild(script);
 
     return () => {
@@ -106,18 +105,23 @@ export const useCartOperations = () => {
       const totalAmount = subtotal + adminFee;
       const orderId = `ORDER-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-      console.log('useCartOperations: Creating order with Midtrans enabled:', paymentSettings.midtransEnabled);
+      console.log('useCartOperations: Creating order:', {
+        subtotal,
+        adminFee,
+        totalAmount,
+        midtransEnabled: paymentSettings.midtransEnabled
+      });
 
-      // Create order first - payment_method will be determined by Midtrans setting
+      // Create order first
       const orderData = {
         user_id: user?.id,
-        created_by: user?.id || '', // Fix: Add the missing created_by field
+        created_by: user?.id || '',
         total_amount: totalAmount,
         admin_fee: adminFee,
         notes: notes || null,
         status: 'pending',
         payment_status: paymentSettings.midtransEnabled ? 'pending' : 'pending_cash',
-        payment_method: paymentSettings.midtransEnabled ? 'qris' : 'cash', // Changed to qris for QRIS-only
+        payment_method: paymentSettings.midtransEnabled ? 'qris' : 'cash',
         order_number: orderId,
         child_name: selectedChild?.name || null,
         child_class: selectedChild?.class_name || null,
@@ -134,7 +138,7 @@ export const useCartOperations = () => {
 
       console.log('Order created successfully:', order);
 
-      // Create order items using the correct menu_item_id from the cart items
+      // Create order items
       const orderItems = items.map(item => ({
         order_id: order.id,
         menu_item_id: item.menu_item_id,
@@ -148,35 +152,39 @@ export const useCartOperations = () => {
 
       if (itemsError) throw itemsError;
 
-      // Check if Midtrans is enabled AFTER order creation but before proceeding with payment
+      // Handle payment based on settings
       if (paymentSettings.midtransEnabled) {
-        console.log('useCartOperations: Midtrans enabled, proceeding with QRIS payment');
+        console.log('useCartOperations: Processing QRIS payment');
         
-        // Prepare payment data
+        // Prepare customer details
         const customerDetails = {
           first_name: user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Customer',
           email: user?.email,
           phone: user?.user_metadata?.phone || '08123456789',
         };
 
+        // Prepare item details with proper admin fee inclusion
         const itemDetails = items.map(item => ({
-          id: item.id,
+          id: item.menu_item_id, // Use menu_item_id for consistency
           price: item.price,
           quantity: item.quantity,
           name: item.name,
         }));
 
-        // Add admin fee as separate item if applicable
+        // Add admin fee as separate line item if applicable
         if (adminFee > 0) {
           itemDetails.push({
             id: 'qris_admin_fee',
             price: adminFee,
             quantity: 1,
-            name: 'Biaya Admin QRIS',
+            name: `Biaya Admin QRIS (${subtotal < 628000 ? '0,07%' : 'Tetap'})`,
           });
         }
 
-        // Create payment transaction with QRIS-only
+        console.log('useCartOperations: Item details for Midtrans:', itemDetails);
+        console.log('useCartOperations: Total amount:', totalAmount);
+
+        // Create payment transaction
         const { data: paymentData, error: paymentError } = await supabase.functions.invoke(
           'create-payment',
           {
@@ -185,15 +193,22 @@ export const useCartOperations = () => {
               amount: totalAmount,
               customerDetails,
               itemDetails,
-              paymentMethod: 'qris', // Force QRIS only
+              paymentMethod: 'qris',
             },
           }
         );
 
-        if (paymentError) throw paymentError;
+        if (paymentError) {
+          console.error('Payment creation error:', paymentError);
+          throw paymentError;
+        }
+
+        console.log('Payment data received:', paymentData);
 
         // Open Midtrans Snap
         if (window.snap && paymentData.snap_token) {
+          console.log('Opening Midtrans Snap with token:', paymentData.snap_token);
+          
           window.snap.pay(paymentData.snap_token, {
             onSuccess: (result) => {
               console.log('QRIS Payment success:', result);
@@ -207,7 +222,7 @@ export const useCartOperations = () => {
               console.log('QRIS Payment pending:', result);
               toast({
                 title: "Menunggu Pembayaran QRIS",
-                description: "Pembayaran QRIS Anda sedang diproses. Mohon tunggu konfirmasi.",
+                description: "Silakan selesaikan pembayaran QRIS Anda.",
               });
               onSuccess();
             },
@@ -215,7 +230,7 @@ export const useCartOperations = () => {
               console.error('QRIS Payment error:', result);
               toast({
                 title: "Pembayaran QRIS Gagal",
-                description: "Terjadi kesalahan dalam proses pembayaran QRIS. Silakan coba lagi.",
+                description: "Terjadi kesalahan dalam proses pembayaran. Silakan coba lagi.",
                 variant: "destructive",
               });
             },
@@ -228,14 +243,17 @@ export const useCartOperations = () => {
             }
           });
         } else {
-          throw new Error('Midtrans Snap not loaded or token not received');
+          console.error('Snap not loaded or no token received:', { 
+            snapAvailable: !!window.snap, 
+            tokenReceived: !!paymentData.snap_token 
+          });
+          throw new Error('Tidak dapat memuat halaman pembayaran QRIS');
         }
       } else {
-        console.log('useCartOperations: Midtrans disabled, cash-only order created');
-        // If Midtrans is disabled, create cash order that can be paid at cashier
+        console.log('useCartOperations: Cash-only order created');
         toast({
           title: "Pesanan Berhasil Dibuat!",
-          description: "Pesanan Anda telah dibuat dengan nomor " + orderId + ". Silakan bayar tunai di kasir untuk menyelesaikan pesanan.",
+          description: `Pesanan ${orderId} berhasil dibuat. Silakan bayar tunai di kasir.`,
           duration: 6000,
         });
         onSuccess();
@@ -244,7 +262,7 @@ export const useCartOperations = () => {
       console.error('Error creating order:', error);
       toast({
         title: "Error",
-        description: error.message || "Gagal membuat pesanan",
+        description: error.message || "Gagal membuat pesanan. Silakan coba lagi.",
         variant: "destructive",
       });
     } finally {

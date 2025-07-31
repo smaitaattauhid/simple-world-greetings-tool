@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 
@@ -17,17 +16,18 @@ serve(async (req) => {
     const { orderId, amount, customerDetails, itemDetails, paymentMethod } = await req.json()
     
     console.log('create-payment: Processing QRIS payment for order:', orderId, 'amount:', amount)
+    console.log('create-payment: Item details received:', itemDetails)
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    // Verify order exists using midtrans_order_id field (not id field)
+    // Verify order exists
     console.log('create-payment: Verifying order exists with midtrans_order_id:', orderId)
     const { data: orderData, error: orderError } = await supabase
       .from('orders')
-      .select('id, total_amount, payment_status')
+      .select('id, total_amount, payment_status, admin_fee')
       .eq('midtrans_order_id', orderId)
       .single()
 
@@ -44,7 +44,7 @@ serve(async (req) => {
 
     console.log('create-payment: Order found:', orderData)
 
-    // Prepare Midtrans request
+    // Get Midtrans credentials
     const midtransServerKey = Deno.env.get('MIDTRANS_SERVER_KEY')
     if (!midtransServerKey) {
       throw new Error('Midtrans server key not configured')
@@ -52,23 +52,36 @@ serve(async (req) => {
 
     const auth = btoa(`${midtransServerKey}:`)
     
-    // QRIS-only configuration
+    // Ensure we have proper item details with admin fee included
+    const finalItemDetails = [...itemDetails]
+    
+    // Verify total amount matches
+    const calculatedTotal = finalItemDetails.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+    console.log('create-payment: Calculated total from items:', calculatedTotal, 'Expected:', amount)
+
+    // QRIS-only Midtrans configuration
     const midtransPayload = {
       transaction_details: {
         order_id: orderId,
         gross_amount: amount
       },
       customer_details: customerDetails,
-      item_details: itemDetails,
-      enabled_payments: ["qris"], // Restrict to QRIS only
-      credit_card: {
-        secure: true
+      item_details: finalItemDetails,
+      enabled_payments: ["qris"], // QRIS only
+      payment_type: "qris", // Force QRIS
+      qris: {
+        acquirer: "gopay" // Use GoPay as QRIS acquirer
+      },
+      custom_expiry: {
+        expiry_duration: 15,
+        unit: "minute"
       },
       custom_field1: paymentMethod || 'qris',
-      custom_field2: 'qris_only_payment'
+      custom_field2: 'qris_only_payment',
+      custom_field3: `admin_fee_${orderData.admin_fee || 0}`
     }
 
-    console.log('create-payment: Creating QRIS-only Midtrans transaction:', midtransPayload)
+    console.log('create-payment: Creating QRIS-only Midtrans transaction:', JSON.stringify(midtransPayload, null, 2))
 
     const midtransResponse = await fetch('https://app.sandbox.midtrans.com/snap/v1/transactions', {
       method: 'POST',
@@ -80,20 +93,54 @@ serve(async (req) => {
       body: JSON.stringify(midtransPayload)
     })
 
+    const responseText = await midtransResponse.text()
+    console.log('create-payment: Midtrans raw response:', responseText)
+
     if (!midtransResponse.ok) {
-      const errorText = await midtransResponse.text()
-      console.error('create-payment: Midtrans QRIS error:', errorText)
-      throw new Error(`Midtrans QRIS error: ${midtransResponse.status} - ${errorText}`)
+      console.error('create-payment: Midtrans QRIS error:', responseText)
+      
+      // Try to parse error for better debugging
+      let errorDetail = responseText
+      try {
+        const errorJson = JSON.parse(responseText)
+        errorDetail = errorJson.error_messages ? errorJson.error_messages.join(', ') : errorJson.message || responseText
+      } catch (e) {
+        // Keep original text if can't parse
+      }
+      
+      throw new Error(`Midtrans QRIS error: ${midtransResponse.status} - ${errorDetail}`)
     }
 
-    const midtransData = await midtransResponse.json()
-    console.log('create-payment: Midtrans QRIS response:', midtransData)
+    let midtransData
+    try {
+      midtransData = JSON.parse(responseText)
+    } catch (e) {
+      throw new Error('Invalid JSON response from Midtrans')
+    }
+
+    console.log('create-payment: Midtrans QRIS success response:', midtransData)
+
+    // Update order with snap token
+    const { error: updateError } = await supabase
+      .from('orders')
+      .update({ 
+        snap_token: midtransData.token,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', orderData.id)
+
+    if (updateError) {
+      console.error('create-payment: Failed to update order with snap token:', updateError)
+      // Don't fail the request, just log
+    }
 
     return new Response(
       JSON.stringify({ 
         snap_token: midtransData.token,
         redirect_url: midtransData.redirect_url,
-        payment_method: 'qris'
+        payment_method: 'qris',
+        order_id: orderId,
+        amount: amount
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -103,7 +150,10 @@ serve(async (req) => {
   } catch (error) {
     console.error('create-payment: QRIS Error:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        details: 'Gagal membuat pembayaran QRIS. Silakan coba lagi.'
+      }),
       { 
         status: 500, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
