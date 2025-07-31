@@ -58,8 +58,8 @@ serve(async (req) => {
       throw new Error("Invalid order IDs provided");
     }
 
-    if (!batchId || !totalAmount) {
-      throw new Error("Batch ID and total amount are required");
+    if (!batchId) {
+      throw new Error("Batch ID is required");
     }
 
     // Use service role key for database operations to bypass RLS
@@ -68,32 +68,6 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
       { auth: { persistSession: false } }
     );
-
-    // First, let's check what orders exist for this user using service role
-    console.log("Checking all orders for user:", user.id);
-    const { data: allUserOrders, error: allOrdersError } = await supabaseService
-      .from('orders')
-      .select('id, payment_status, total_amount, child_name, user_id')
-      .eq('user_id', user.id);
-
-    if (allOrdersError) {
-      console.error("Error fetching all user orders:", allOrdersError);
-    } else {
-      console.log("All user orders:", allUserOrders);
-    }
-
-    // Now check the specific orders requested
-    console.log("Checking specific orders with IDs:", orderIds);
-    const { data: requestedOrders, error: requestedOrdersError } = await supabaseService
-      .from('orders')
-      .select('id, payment_status, total_amount, child_name, user_id')
-      .in('id', orderIds);
-
-    if (requestedOrdersError) {
-      console.error("Error fetching requested orders:", requestedOrdersError);
-    } else {
-      console.log("Requested orders found:", requestedOrders);
-    }
 
     // Verify all orders belong to the user and are pending payment
     const { data: orders, error: ordersError } = await supabaseService
@@ -112,42 +86,31 @@ serve(async (req) => {
     console.log("Orders details:", orders);
     
     if (!orders || orders.length === 0) {
-      // Let's provide more specific error information
-      const { data: ordersWithDifferentStatus, error: statusError } = await supabaseService
-        .from('orders')
-        .select('id, payment_status, user_id')
-        .in('id', orderIds);
-        
-      if (!statusError && ordersWithDifferentStatus) {
-        console.log("Orders with any status:", ordersWithDifferentStatus);
-        const userOrders = ordersWithDifferentStatus.filter(o => o.user_id === user.id);
-        const nonPendingOrders = userOrders.filter(o => o.payment_status !== 'pending');
-        
-        if (userOrders.length === 0) {
-          throw new Error("None of the selected orders belong to your account");
-        } else if (nonPendingOrders.length > 0) {
-          throw new Error(`Some orders are not eligible for payment. Found ${nonPendingOrders.length} orders with status other than 'pending'`);
-        }
-      }
-      
       throw new Error("No eligible orders found for batch payment");
     }
 
-    // Check if some orders are missing
-    const foundOrderIds = orders.map(order => order.id);
-    const missingOrderIds = orderIds.filter(id => !foundOrderIds.includes(id));
-    
-    if (missingOrderIds.length > 0) {
-      console.log("Missing or ineligible orders:", missingOrderIds);
-      console.log("Proceeding with available orders only");
+    // Calculate subtotal (original amount without existing admin fees)
+    const subtotal = orders.reduce((sum, order) => {
+      const originalAmount = order.total_amount - (order.admin_fee || 0);
+      return sum + originalAmount;
+    }, 0);
+
+    // Calculate QRIS admin fee based on subtotal
+    let adminFee = 0;
+    if (subtotal < 628000) {
+      adminFee = Math.round(subtotal * 0.0007); // 0.07%
+    } else {
+      adminFee = 4400; // Fixed Rp 4,400
     }
 
-    // Validate total amount with found orders
-    const calculatedTotal = orders.reduce((sum, order) => sum + order.total_amount, 0);
-    console.log("Calculated total:", calculatedTotal, "Expected total:", totalAmount);
+    const totalWithAdminFee = subtotal + adminFee;
     
-    // Use calculated total from actual orders instead of provided total
-    const actualTotal = calculatedTotal;
+    console.log("Batch payment calculation:", {
+      subtotal,
+      adminFee,
+      totalWithAdminFee,
+      adminFeeType: subtotal < 628000 ? '0.07%' : 'Fixed Rp 4,400'
+    });
 
     // Create Midtrans order ID with proper length validation
     const timestamp = Date.now();
@@ -162,22 +125,47 @@ serve(async (req) => {
       throw new Error("Midtrans server key not configured");
     }
 
+    // Prepare item details - individual orders plus admin fee
+    const itemDetails = orders.map((order, index) => ({
+      id: order.id.toString().substr(0, 50),
+      price: Math.round(order.total_amount - (order.admin_fee || 0)), // Original amount without admin fee
+      quantity: 1,
+      name: `Pesanan ${order.child_name || `#${index + 1}`}`.substr(0, 50)
+    }));
+
+    // Add admin fee as separate line item
+    if (adminFee > 0) {
+      itemDetails.push({
+        id: 'qris_admin_fee_batch',
+        price: adminFee,
+        quantity: 1,
+        name: `Biaya Admin QRIS Batch (${subtotal < 628000 ? '0,07%' : 'Tetap Rp 4.400'})`
+      });
+    }
+
     // Prepare Midtrans request payload
     const midtransPayload = {
       transaction_details: {
         order_id: midtransOrderId,
-        gross_amount: Math.round(actualTotal)
+        gross_amount: Math.round(totalWithAdminFee)
       },
       customer_details: {
         email: user.email || "customer@example.com",
         first_name: user.user_metadata?.full_name || "Customer"
       },
-      item_details: orders.map((order, index) => ({
-        id: order.id.toString().substr(0, 50),
-        price: Math.round(order.total_amount),
-        quantity: 1,
-        name: `Pesanan ${order.child_name || `#${index + 1}`}`.substr(0, 50)
-      })),
+      item_details: itemDetails,
+      enabled_payments: ["qris"], // QRIS only
+      payment_type: "qris",
+      qris: {
+        acquirer: "gopay"
+      },
+      custom_expiry: {
+        expiry_duration: 15,
+        unit: "minute"
+      },
+      custom_field1: 'qris_batch_payment',
+      custom_field2: `batch_${batchId}`,
+      custom_field3: `admin_fee_${adminFee}`,
       callbacks: {
         finish: `${req.headers.get("origin") || "https://your-domain.com"}/orders`
       }
@@ -224,12 +212,15 @@ serve(async (req) => {
       throw new Error("No snap token received from Midtrans");
     }
 
-    // Update only the found orders with Midtrans data
+    // Update orders with Midtrans data and new total including admin fee
+    const foundOrderIds = orders.map(order => order.id);
     const { error: updateError } = await supabaseService
       .from('orders')
       .update({
         midtrans_order_id: midtransOrderId,
         snap_token: midtransData.token,
+        admin_fee: Math.round(adminFee / orders.length), // Distribute admin fee across orders
+        total_amount: Math.round(totalWithAdminFee / orders.length), // Update with proportional total
         updated_at: new Date().toISOString()
       })
       .in('id', foundOrderIds);
@@ -239,7 +230,7 @@ serve(async (req) => {
       throw new Error(`Failed to update orders with payment information: ${updateError.message}`);
     }
 
-    // Create batch_orders entries for found orders only
+    // Create batch_orders entries
     const batchOrdersData = foundOrderIds.map(orderId => ({
       batch_id: batchId,
       order_id: orderId
@@ -262,7 +253,9 @@ serve(async (req) => {
       snap_token: midtransData.token,
       order_id: midtransOrderId,
       batch_id: batchId,
-      total_amount: actualTotal,
+      total_amount: totalWithAdminFee,
+      admin_fee: adminFee,
+      subtotal: subtotal,
       processed_orders: foundOrderIds.length,
       total_requested: orderIds.length
     }), {

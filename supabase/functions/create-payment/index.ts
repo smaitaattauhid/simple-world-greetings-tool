@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 
@@ -52,9 +53,31 @@ serve(async (req) => {
 
     const auth = btoa(`${midtransServerKey}:`)
     
+    // Calculate admin fee using QRIS rules
+    const subtotal = amount - (orderData.admin_fee || 0)
+    let adminFee = 0
+    
+    if (subtotal < 628000) {
+      adminFee = Math.round(subtotal * 0.0007) // 0.07%
+    } else {
+      adminFee = 4400 // Fixed Rp 4,400
+    }
+
+    console.log('create-payment: Calculated QRIS admin fee:', adminFee, 'for subtotal:', subtotal)
+
     // Ensure we have proper item details with admin fee included
     const finalItemDetails = [...itemDetails]
     
+    // Add admin fee as separate line item if applicable
+    if (adminFee > 0) {
+      finalItemDetails.push({
+        id: 'qris_admin_fee',
+        price: adminFee,
+        quantity: 1,
+        name: `Biaya Admin QRIS (${subtotal < 628000 ? '0,07%' : 'Tetap Rp 4.400'})`
+      })
+    }
+
     // Verify total amount matches
     const calculatedTotal = finalItemDetails.reduce((sum, item) => sum + (item.price * item.quantity), 0)
     console.log('create-payment: Calculated total from items:', calculatedTotal, 'Expected:', amount)
@@ -63,7 +86,7 @@ serve(async (req) => {
     const midtransPayload = {
       transaction_details: {
         order_id: orderId,
-        gross_amount: amount
+        gross_amount: calculatedTotal // Use calculated total to ensure accuracy
       },
       customer_details: customerDetails,
       item_details: finalItemDetails,
@@ -78,7 +101,7 @@ serve(async (req) => {
       },
       custom_field1: paymentMethod || 'qris',
       custom_field2: 'qris_only_payment',
-      custom_field3: `admin_fee_${orderData.admin_fee || 0}`
+      custom_field3: `admin_fee_${adminFee}`
     }
 
     console.log('create-payment: Creating QRIS-only Midtrans transaction:', JSON.stringify(midtransPayload, null, 2))
@@ -140,7 +163,8 @@ serve(async (req) => {
         redirect_url: midtransData.redirect_url,
         payment_method: 'qris',
         order_id: orderId,
-        amount: amount
+        amount: calculatedTotal,
+        admin_fee: adminFee
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
