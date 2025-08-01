@@ -53,12 +53,12 @@ serve(async (req) => {
 
     const auth = btoa(`${midtransServerKey}:`)
     
-    // Calculate admin fee using QRIS rules
+    // Calculate admin fee using QRIS rules with updated 0.7% rate
     const subtotal = amount - (orderData.admin_fee || 0)
     let adminFee = 0
     
     if (subtotal < 628000) {
-      adminFee = Math.round(subtotal * 0.0007) // 0.07%
+      adminFee = Math.round(subtotal * 0.007) // Updated to 0.7%
     } else {
       adminFee = 4400 // Fixed Rp 4,400
     }
@@ -74,7 +74,7 @@ serve(async (req) => {
         id: 'qris_admin_fee',
         price: adminFee,
         quantity: 1,
-        name: `Biaya Admin QRIS (${subtotal < 628000 ? '0,07%' : 'Tetap Rp 4.400'})`
+        name: `Biaya Admin QRIS (${subtotal < 628000 ? '0,7%' : 'Tetap Rp 4.400'})`
       })
     }
 

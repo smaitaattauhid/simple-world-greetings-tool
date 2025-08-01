@@ -10,7 +10,7 @@ interface PaymentSettings {
 export const usePaymentSettings = () => {
   const [settings, setSettings] = useState<PaymentSettings>({
     midtransEnabled: false, // Start with false as default for safety
-    adminFeePercentage: 0.07
+    adminFeePercentage: 0.7 // Updated to 0.7%
   });
   const [loading, setLoading] = useState(true);
 
@@ -40,7 +40,7 @@ export const usePaymentSettings = () => {
 
       const newSettings = {
         midtransEnabled: settingsMap.midtrans_enabled === 'true',
-        adminFeePercentage: parseFloat(settingsMap.midtrans_admin_fee_percentage || '0.07')
+        adminFeePercentage: parseFloat(settingsMap.midtrans_admin_fee_percentage || '0.7') // Updated default to 0.7%
       };
       
       console.log('usePaymentSettings: New settings applied:', newSettings);
@@ -50,7 +50,7 @@ export const usePaymentSettings = () => {
       // Keep safe defaults on error
       setSettings({
         midtransEnabled: false,
-        adminFeePercentage: 0.07
+        adminFeePercentage: 0.7 // Updated default to 0.7%
       });
     } finally {
       setLoading(false);
@@ -111,7 +111,7 @@ export const usePaymentSettings = () => {
     return fee;
   };
 
-  // New QRIS admin fee calculation with specific rules
+  // Updated QRIS admin fee calculation with 0.7% for small transactions
   const calculateQRISAdminFee = (amount: number, paymentMethod: 'qris' | 'cash' = 'qris') => {
     // Only calculate admin fee if Midtrans is enabled and payment method is QRIS
     if (paymentMethod === 'cash' || !settings.midtransEnabled) {
@@ -122,8 +122,8 @@ export const usePaymentSettings = () => {
     let fee = 0;
     
     if (amount < 628000) {
-      // If total transaction is less than 628,000, admin fee is 0.07% of total
-      fee = Math.round(amount * 0.0007); // 0.07%
+      // If total transaction is less than 628,000, admin fee is 0.7% of total
+      fee = Math.round(amount * 0.007); // 0.7%
     } else {
       // If total transaction is 628,000 or more, admin fee is fixed at Rp 4,400
       fee = 4400;

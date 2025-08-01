@@ -11,7 +11,7 @@ import { Settings, CreditCard, Percent, QrCode } from 'lucide-react';
 
 export const PaymentSettings = () => {
   const [midtransEnabled, setMidtransEnabled] = useState(true);
-  const [adminFeePercentage, setAdminFeePercentage] = useState(0.07);
+  const [adminFeePercentage, setAdminFeePercentage] = useState(0.7); // Updated to 0.7%
   const [loading, setLoading] = useState(false);
   const [loadingSettings, setLoadingSettings] = useState(true);
 
@@ -43,7 +43,7 @@ export const PaymentSettings = () => {
       console.log('PaymentSettings: Settings map:', settingsMap);
 
       setMidtransEnabled(settingsMap.midtrans_enabled === 'true');
-      setAdminFeePercentage(parseFloat(settingsMap.midtrans_admin_fee_percentage || '0.07'));
+      setAdminFeePercentage(parseFloat(settingsMap.midtrans_admin_fee_percentage || '0.7')); // Updated default to 0.7%
       
     } catch (error) {
       console.error('PaymentSettings: Error in fetchSettings:', error);
@@ -219,7 +219,7 @@ export const PaymentSettings = () => {
             <div className="text-sm text-blue-700 space-y-2">
               <div className="flex justify-between">
                 <span>Transaksi &lt; Rp 628.000:</span>
-                <span className="font-medium">0,07% dari total</span>
+                <span className="font-medium">0,7% dari total</span>
               </div>
               <div className="flex justify-between">
                 <span>Transaksi ≥ Rp 628.000:</span>
@@ -243,7 +243,7 @@ export const PaymentSettings = () => {
                 className="mt-1"
               />
               <p className="text-xs text-gray-500 mt-1">
-                Default: 0,07% (hanya untuk transaksi &lt; Rp 628.000)
+                Default: 0,7% (hanya untuk transaksi &lt; Rp 628.000)
               </p>
             </div>
             <Button

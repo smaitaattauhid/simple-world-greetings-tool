@@ -154,7 +154,7 @@ const Cart = ({ items, onUpdateCart }: CartProps) => {
                 <span>{formatPrice(subtotal)}</span>
               </div>
               
-              {/* Show QRIS admin fee calculation with detailed breakdown */}
+              {/* Show QRIS admin fee calculation with updated 0.7% rate */}
               {paymentSettings.midtransEnabled && (
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm text-orange-600">
@@ -163,7 +163,7 @@ const Cart = ({ items, onUpdateCart }: CartProps) => {
                   </div>
                   <div className="text-xs text-gray-500">
                     {subtotal < 628000 
-                      ? `• Transaksi < Rp 628.000: 0,07% dari ${formatPrice(subtotal)} = ${formatPrice(Math.round(subtotal * 0.0007))}` 
+                      ? `• Transaksi < Rp 628.000: 0,7% dari ${formatPrice(subtotal)} = ${formatPrice(Math.round(subtotal * 0.007))}` 
                       : `• Transaksi ≥ Rp 628.000: Biaya tetap Rp 4.400`
                     }
                   </div>

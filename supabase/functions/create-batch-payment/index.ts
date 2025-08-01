@@ -95,10 +95,10 @@ serve(async (req) => {
       return sum + originalAmount;
     }, 0);
 
-    // Calculate QRIS admin fee based on subtotal
+    // Calculate QRIS admin fee based on subtotal with updated 0.7% rate
     let adminFee = 0;
     if (subtotal < 628000) {
-      adminFee = Math.round(subtotal * 0.0007); // 0.07%
+      adminFee = Math.round(subtotal * 0.007); // Updated to 0.7%
     } else {
       adminFee = 4400; // Fixed Rp 4,400
     }
@@ -109,7 +109,7 @@ serve(async (req) => {
       subtotal,
       adminFee,
       totalWithAdminFee,
-      adminFeeType: subtotal < 628000 ? '0.07%' : 'Fixed Rp 4,400'
+      adminFeeType: subtotal < 628000 ? '0.7%' : 'Fixed Rp 4,400'
     });
 
     // Create Midtrans order ID with proper length validation
@@ -139,7 +139,7 @@ serve(async (req) => {
         id: 'qris_admin_fee_batch',
         price: adminFee,
         quantity: 1,
-        name: `Biaya Admin QRIS Batch (${subtotal < 628000 ? '0,07%' : 'Tetap Rp 4.400'})`
+        name: `Biaya Admin QRIS Batch (${subtotal < 628000 ? '0,7%' : 'Tetap Rp 4.400'})`
       });
     }
 
@@ -220,7 +220,7 @@ serve(async (req) => {
         midtrans_order_id: midtransOrderId,
         snap_token: midtransData.token,
         admin_fee: Math.round(adminFee / orders.length), // Distribute admin fee across orders
-        total_amount: Math.round(totalWithAdminFee / orders.length), // Update with proportional total
+        total_amount: Math.round((subtotal + adminFee) / orders.length), // Update with proportional total including admin fee
         updated_at: new Date().toISOString()
       })
       .in('id', foundOrderIds);
