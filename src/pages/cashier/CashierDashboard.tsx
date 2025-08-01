@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { formatPrice, formatDate } from '@/utils/orderUtils';
+import { formatPrice, isOrderExpired } from '@/utils/orderUtils';
 import { Search, User, Calendar, CreditCard, Receipt, Eye, EyeOff, CheckSquare, Calculator } from 'lucide-react';
 import { CashPayment } from '@/components/cashier/CashPayment';
 import { StudentSearchCombobox } from '@/components/cashier/StudentSearchCombobox';
@@ -48,6 +48,21 @@ const CashierDashboard = () => {
   useEffect(() => {
     fetchPendingOrders();
   }, []);
+
+  const formatDateOnly = (dateString: string | null | undefined) => {
+    if (!dateString) return 'Tidak diatur';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('id-ID', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    } catch (error) {
+      console.error('CashierDashboard: Error formatting date:', error);
+      return 'Format tanggal tidak valid';
+    }
+  };
 
   const fetchPendingOrders = async () => {
     try {
@@ -101,9 +116,13 @@ const CashierDashboard = () => {
         throw error;
       }
 
-      console.log('CashierDashboard: Fetched orders:', data?.length || 0);
-      console.log('CashierDashboard: Sample order data:', data?.[0]);
-      setOrders(data || []);
+      console.log('CashierDashboard: Fetched orders before filtering:', data?.length || 0);
+      
+      // Filter out expired orders
+      const validOrders = (data || []).filter(order => !isOrderExpired(order.delivery_date));
+      
+      console.log('CashierDashboard: Orders after filtering expired:', validOrders.length);
+      setOrders(validOrders);
     } catch (error) {
       console.error('CashierDashboard: Error in fetchPendingOrders:', error);
       toast({
@@ -183,10 +202,15 @@ const CashierDashboard = () => {
         throw error;
       }
 
-      console.log('CashierDashboard: Search results:', data?.length || 0);
-      setOrders(data || []);
+      console.log('CashierDashboard: Search results before filtering:', data?.length || 0);
+      
+      // Filter out expired orders from search results too
+      const validOrders = (data || []).filter(order => !isOrderExpired(order.delivery_date));
+      
+      console.log('CashierDashboard: Search results after filtering expired:', validOrders.length);
+      setOrders(validOrders);
 
-      if (!data || data.length === 0) {
+      if (!validOrders || validOrders.length === 0) {
         toast({
           title: "Tidak Ditemukan",
           description: "Tidak ada pesanan yang sesuai dengan pencarian",
@@ -257,16 +281,6 @@ const CashierDashboard = () => {
       batchOrders: selectedOrders,
       total_amount: selectedOrders.reduce((sum, order) => sum + order.total_amount, 0)
     } as any);
-  };
-
-  const formatDateSafe = (dateString: string | null | undefined) => {
-    if (!dateString) return 'Tidak diatur';
-    try {
-      return formatDate(dateString);
-    } catch (error) {
-      console.error('CashierDashboard: Error formatting date:', error);
-      return 'Format tanggal tidak valid';
-    }
   };
 
   if (selectedOrder) {
@@ -367,7 +381,7 @@ const CashierDashboard = () => {
             <div>
               <CardTitle>Pesanan Pending Pembayaran</CardTitle>
               <p className="text-sm text-gray-600">
-                Total: {orders.length} pesanan
+                Total: {orders.length} pesanan (pesanan kadaluarsa disembunyikan)
               </p>
             </div>
             
@@ -426,7 +440,8 @@ const CashierDashboard = () => {
             </div>
           ) : orders.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-gray-500">Tidak ada pesanan pending</p>
+              <p className="text-gray-500">Tidak ada pesanan pending yang dapat dibayar</p>
+              <p className="text-sm text-gray-400 mt-1">Pesanan yang sudah kadaluarsa tidak ditampilkan</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -466,7 +481,7 @@ const CashierDashboard = () => {
                           <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">
                             <div className="flex items-center">
                               <Calendar className="h-4 w-4 mr-1" />
-                              <span>Katering: {formatDateSafe(order.delivery_date)}</span>
+                              <span>Katering: {formatDateOnly(order.delivery_date)}</span>
                             </div>
                             <div className="flex items-center">
                               <Receipt className="h-4 w-4 mr-1" />
