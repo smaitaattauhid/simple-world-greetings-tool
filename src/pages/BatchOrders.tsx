@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -48,15 +49,29 @@ export default function BatchOrders() {
     console.log('BatchOrders: Generated batch ID:', newBatchId);
   }, [batchState, navigate, toast]);
 
+  // Calculate subtotal exactly the same way as in the edge function
   const subtotalAmount = orders.reduce((sum, order) => {
-    // Subtract existing admin fee if any to get original subtotal
-    const originalAmount = order.total_amount - (order.admin_fee || 0);
+    // Use Math.round to match edge function calculation exactly
+    const originalAmount = Math.round(order.total_amount - (order.admin_fee || 0));
     return sum + originalAmount;
   }, 0);
 
-  // Use QRIS admin fee calculation method instead of the old method
-  const totalAdminFee = calculateQRISAdminFee(subtotalAmount, 'qris');
+  // Calculate QRIS admin fee exactly the same way as in the edge function
+  let totalAdminFee = 0;
+  if (subtotalAmount < 628000) {
+    totalAdminFee = Math.round(subtotalAmount * 0.007); // 0.7%
+  } else {
+    totalAdminFee = 4400; // Fixed Rp 4,400
+  }
+
   const totalAmount = subtotalAmount + totalAdminFee;
+
+  console.log('BatchOrders: Payment calculation:', {
+    subtotalAmount,
+    totalAdminFee,
+    totalAmount,
+    adminFeeType: subtotalAmount < 628000 ? '0.7%' : 'Fixed Rp 4,400'
+  });
 
   const handleBatchPayment = async () => {
     if (orders.length === 0) {
@@ -234,7 +249,7 @@ export default function BatchOrders() {
                     </div>
                     <div className="text-right">
                       <p className="font-semibold text-orange-600">
-                        {formatPrice(order.total_amount - (order.admin_fee || 0))}
+                        {formatPrice(Math.round(order.total_amount - (order.admin_fee || 0)))}
                       </p>
                       <Badge variant="secondary" className="text-xs">
                         {order.order_items.length} item
