@@ -20,7 +20,7 @@ export default function BatchOrders() {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { calculateAdminFee } = usePaymentSettings();
+  const { calculateQRISAdminFee } = usePaymentSettings();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
   const [batchId, setBatchId] = useState<string>('');
@@ -54,7 +54,8 @@ export default function BatchOrders() {
     return sum + originalAmount;
   }, 0);
 
-  const totalAdminFee = calculateAdminFee(subtotalAmount, 'midtrans');
+  // Use QRIS admin fee calculation method instead of the old method
+  const totalAdminFee = calculateQRISAdminFee(subtotalAmount, 'qris');
   const totalAmount = subtotalAmount + totalAdminFee;
 
   const handleBatchPayment = async () => {
@@ -279,7 +280,7 @@ export default function BatchOrders() {
                 </div>
                 {totalAdminFee > 0 && (
                   <div className="flex justify-between text-sm text-orange-600">
-                    <span>Biaya Admin:</span>
+                    <span>Biaya Admin QRIS:</span>
                     <span>{formatPrice(totalAdminFee)}</span>
                   </div>
                 )}
@@ -300,7 +301,7 @@ export default function BatchOrders() {
                       <li>• Semua pesanan akan dibayar sekaligus</li>
                       <li>• Status pembayaran akan diupdate otomatis</li>
                       {totalAdminFee > 0 && (
-                        <li>• Biaya admin 0.07% untuk transaksi Midtrans</li>
+                        <li>• Biaya admin QRIS: {subtotalAmount < 628000 ? '0,7%' : 'Rp 4.400 (tetap)'}</li>
                       )}
                     </ul>
                   </div>
