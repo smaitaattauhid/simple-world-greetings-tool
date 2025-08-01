@@ -1,4 +1,5 @@
 
+
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -49,11 +50,13 @@ export default function BatchOrders() {
     console.log('BatchOrders: Generated batch ID:', newBatchId);
   }, [batchState, navigate, toast]);
 
-  // Calculate subtotal exactly the same way as in the edge function
+  // Calculate subtotal based on menu prices instead of order totals
   const subtotalAmount = orders.reduce((sum, order) => {
-    // Use Math.round to match edge function calculation exactly
-    const originalAmount = Math.round(order.total_amount - (order.admin_fee || 0));
-    return sum + originalAmount;
+    // Calculate menu prices from order_items
+    const menuTotal = order.order_items.reduce((itemSum, item) => {
+      return itemSum + (item.price * item.quantity);
+    }, 0);
+    return sum + menuTotal;
   }, 0);
 
   // Calculate QRIS admin fee exactly the same way as in the edge function
@@ -232,47 +235,54 @@ export default function BatchOrders() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {orders.map((order) => (
-                <div key={order.id} className="border rounded-lg p-4">
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <h4 className="font-medium">{order.child_name}</h4>
-                      <p className="text-sm text-gray-600">Kelas {order.child_class}</p>
-                      {order.delivery_date && (
-                        <p className="text-sm text-gray-600">
-                          Pengiriman: {formatDate(order.delivery_date)}
+              {orders.map((order) => {
+                // Calculate menu total for display
+                const menuTotal = order.order_items.reduce((sum, item) => {
+                  return sum + (item.price * item.quantity);
+                }, 0);
+                
+                return (
+                  <div key={order.id} className="border rounded-lg p-4">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <h4 className="font-medium">{order.child_name}</h4>
+                        <p className="text-sm text-gray-600">Kelas {order.child_class}</p>
+                        {order.delivery_date && (
+                          <p className="text-sm text-gray-600">
+                            Pengiriman: {formatDate(order.delivery_date)}
+                          </p>
+                        )}
+                        <p className="text-xs text-gray-500">
+                          Status: {order.payment_status} | ID: {order.id.substring(0, 8)}...
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-orange-600">
+                          {formatPrice(menuTotal)}
+                        </p>
+                        <Badge variant="secondary" className="text-xs">
+                          {order.order_items.length} item
+                        </Badge>
+                      </div>
+                    </div>
+                    
+                    {/* Order Items Summary */}
+                    <div className="mt-3 space-y-1">
+                      {order.order_items.slice(0, 3).map((item) => (
+                        <div key={item.id} className="flex justify-between text-sm text-gray-600">
+                          <span>{item.quantity}x {item.menu_items?.name || 'Unknown Item'}</span>
+                          <span>{formatPrice(item.price * item.quantity)}</span>
+                        </div>
+                      ))}
+                      {order.order_items.length > 3 && (
+                        <p className="text-xs text-gray-500">
+                          +{order.order_items.length - 3} item lainnya
                         </p>
                       )}
-                      <p className="text-xs text-gray-500">
-                        Status: {order.payment_status} | ID: {order.id.substring(0, 8)}...
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-orange-600">
-                        {formatPrice(Math.round(order.total_amount - (order.admin_fee || 0)))}
-                      </p>
-                      <Badge variant="secondary" className="text-xs">
-                        {order.order_items.length} item
-                      </Badge>
                     </div>
                   </div>
-                  
-                  {/* Order Items Summary */}
-                  <div className="mt-3 space-y-1">
-                    {order.order_items.slice(0, 3).map((item) => (
-                      <div key={item.id} className="flex justify-between text-sm text-gray-600">
-                        <span>{item.quantity}x {item.menu_items?.name || 'Unknown Item'}</span>
-                        <span>{formatPrice(item.price * item.quantity)}</span>
-                      </div>
-                    ))}
-                    {order.order_items.length > 3 && (
-                      <p className="text-xs text-gray-500">
-                        +{order.order_items.length - 3} item lainnya
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </CardContent>
           </Card>
         </div>
@@ -295,7 +305,7 @@ export default function BatchOrders() {
                 </div>
                 {totalAdminFee > 0 && (
                   <div className="flex justify-between text-sm text-orange-600">
-                    <span>Biaya Admin QRIS:</span>
+                    <span>Biaya admin {subtotalAmount < 628000 ? '0,7%' : 'Rp 4.400'}:</span>
                     <span>{formatPrice(totalAdminFee)}</span>
                   </div>
                 )}
@@ -316,7 +326,7 @@ export default function BatchOrders() {
                       <li>• Semua pesanan akan dibayar sekaligus</li>
                       <li>• Status pembayaran akan diupdate otomatis</li>
                       {totalAdminFee > 0 && (
-                        <li>• Biaya admin QRIS: {subtotalAmount < 628000 ? '0,7%' : 'Rp 4.400 (tetap)'}</li>
+                        <li>• Biaya admin: {subtotalAmount < 628000 ? '0,7%' : 'Rp 4.400 (tetap)'}</li>
                       )}
                     </ul>
                   </div>
@@ -348,3 +358,4 @@ export default function BatchOrders() {
     </div>
   );
 }
+
