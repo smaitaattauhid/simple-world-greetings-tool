@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -107,11 +106,19 @@ export const SecureAuthForm: React.FC<SecureAuthFormProps> = ({ mode, onModeChan
   return (
     <Card className="w-full max-w-md mx-auto">
       <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl font-bold flex items-center">
+        {/* Logo */}
+        <div className="flex justify-center mb-4">
+          <img 
+            src="https://lh3.googleusercontent.com/d/1ZDW1GB_y68htjrMiZHZQ478Eu0j_DBv-=s360?authuser=0" 
+            alt="Dapoer At-Tauhid Logo" 
+            className="h-360 w-360 object-contain"
+          />
+        </div>
+        <CardTitle className="text-2xl font-bold flex items-center justify-center">
           <Shield className="h-6 w-6 mr-2" />
           {mode === 'login' ? 'Sign In' : 'Create Account'}
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-center">
           {mode === 'login' 
             ? 'Enter your credentials to access your account' 
             : 'Create a new account to get started'

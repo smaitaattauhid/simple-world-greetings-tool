@@ -76,8 +76,15 @@ export const Navbar = () => {
   return (
     <div className="bg-white border-b shadow-sm sticky top-0 z-50">
       <div className="container mx-auto py-4 px-6 flex items-center justify-between">
-        <Link to="/" className="text-xl font-bold text-orange-500">
-          Kantin App
+        <Link to="/" className="flex items-center space-x-3">
+          <img 
+            src="https://lh3.googleusercontent.com/d/1ZDW1GB_y68htjrMiZHZQ478Eu0j_DBv-=s360?authuser=0" 
+            alt="Dapoer At-Tauhid Logo" 
+            className="h-8 w-8 object-contain"
+          />
+          <span className="text-xl font-bold text-orange-500">
+            Dapoer At-Tauhid
+          </span>
         </Link>
 
         <div className="hidden md:flex items-center space-x-4">

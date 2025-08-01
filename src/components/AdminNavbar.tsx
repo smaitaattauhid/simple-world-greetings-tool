@@ -81,8 +81,15 @@ const AdminNavbar = () => {
       <div className="container mx-auto px-2 md:px-4">
         <div className="flex items-center justify-between h-14 md:h-16">
           {/* Logo */}
-          <Link to="/admin" className="text-lg md:text-2xl font-bold truncate">
-            CateringKu Admin
+          <Link to="/admin" className="flex items-center space-x-2">
+            <img 
+              src="https://lh3.googleusercontent.com/d/1ZDW1GB_y68htjrMiZHZQ478Eu0j_DBv-=s360?authuser=0" 
+              alt="Dapoer At-Tauhid Logo" 
+              className="h-6 w-6 md:h-8 md:w-8 object-contain"
+            />
+            <span className="text-lg md:text-2xl font-bold truncate">
+              Dapoer At-Tauhid Admin
+            </span>
           </Link>
 
           {/* Desktop Navigation */}
